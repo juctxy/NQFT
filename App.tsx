@@ -1,15 +1,17 @@
 
 import { StatusBar } from 'expo-status-bar';
+import Slider from '@react-native-community/slider';
 import {
   StyleSheet,
   Text,
   View,
   Pressable,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { useState } from 'react';
 
-// 1. Khai báo kiểu dữ liệu cho hướng di chuyển
+// 1. Các hướng di chuyển
 type Direction =
   | 'FORWARD'
   | 'BACKWARD'
@@ -21,19 +23,17 @@ type Direction =
   | 'BACKWARD_RIGHT'
   | 'STOP';
 
-// 2. Component điều chỉnh tốc độ motor
+// 2. Component điều chỉnh tốc độ motor bằng Slider
 type MotorSpeedControlProps = {
   motorName: string;
   speed: number;
-  onDecrease: () => void;
-  onIncrease: () => void;
+  onSpeedChange: (value: number) => void;
 };
 
 function MotorSpeedControl({
   motorName,
   speed,
-  onDecrease,
-  onIncrease,
+  onSpeedChange,
 }: MotorSpeedControlProps) {
   return (
     <View style={styles.motorCard}>
@@ -42,25 +42,21 @@ function MotorSpeedControl({
         <Text style={styles.speedValue}>{speed}/255</Text>
       </View>
 
-      <View style={styles.progressBackground}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${(speed / 255) * 100}%` },
-          ]}
-        />
-      </View>
+      <Slider
+        style={styles.slider}
+        minimumValue={0}
+        maximumValue={255}
+        step={1}
+        value={speed}
+        onValueChange={onSpeedChange}
+        minimumTrackTintColor="#3B82F6"
+        maximumTrackTintColor="#334155"
+        thumbTintColor="#60A5FA"
+      />
 
-      <View style={styles.speedControls}>
-        <Pressable style={styles.adjustButton} onPress={onDecrease}>
-          <Text style={styles.adjustText}>−</Text>
-        </Pressable>
-
-        <Text style={styles.speedDescription}>Speed</Text>
-
-        <Pressable style={styles.adjustButton} onPress={onIncrease}>
-          <Text style={styles.adjustText}>+</Text>
-        </Pressable>
+      <View style={styles.sliderLabels}>
+        <Text style={styles.sliderLabel}>0</Text>
+        <Text style={styles.sliderLabel}>255</Text>
       </View>
     </View>
   );
@@ -94,8 +90,11 @@ function DirectionButton({
   );
 }
 
-// 4. Component chính của ứng dụng
+// 4. Component chính
 export default function App() {
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
   const [direction, setDirection] = useState<Direction>('STOP');
 
   const [motor1Speed, setMotor1Speed] = useState(128);
@@ -104,17 +103,7 @@ export default function App() {
   const [function1, setFunction1] = useState(false);
   const [function2, setFunction2] = useState(false);
 
-  // Điều chỉnh tốc độ, giới hạn từ 0 đến 255
-  const changeSpeed = (
-    currentSpeed: number,
-    setSpeed: (value: number) => void,
-    amount: number,
-  ) => {
-    const newSpeed = Math.max(0, Math.min(255, currentSpeed + amount));
-    setSpeed(newSpeed);
-  };
-
-  // Nhấn nút khẩn cấp
+  // Dừng robot
   const emergencyStop = () => {
     setDirection('STOP');
   };
@@ -122,7 +111,10 @@ export default function App() {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[
+        styles.container,
+        isLandscape && styles.landscapeContainer,
+      ]}
     >
       <StatusBar style="light" />
 
@@ -147,152 +139,169 @@ export default function App() {
         </Text>
       </View>
 
-      {/* MOVEMENT CONTROL */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>MOVEMENT CONTROL</Text>
+      {/* MAIN RESPONSIVE LAYOUT */}
+      <View
+        style={[
+          styles.mainLayout,
+          isLandscape
+            ? styles.landscapeLayout
+            : styles.portraitLayout,
+        ]}
+      >
+        {/* LEFT: MOVEMENT CONTROL */}
+        <View
+          style={[
+            styles.movementSection,
+            isLandscape && styles.landscapeMovement,
+          ]}
+        >
+          <Text style={styles.sectionTitle}>MOVEMENT CONTROL</Text>
 
-        <View style={styles.directionGrid}>
-          <DirectionButton
-            label="↖"
-            direction="FORWARD_LEFT"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
+          <View style={styles.directionGrid}>
+            <DirectionButton
+              label="↖"
+              direction="FORWARD_LEFT"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
 
-          <DirectionButton
-            label="↑"
-            direction="FORWARD"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
+            <DirectionButton
+              label="↑"
+              direction="FORWARD"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
 
-          <DirectionButton
-            label="↗"
-            direction="FORWARD_RIGHT"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
+            <DirectionButton
+              label="↗"
+              direction="FORWARD_RIGHT"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
 
-          <DirectionButton
-            label="←"
-            direction="LEFT"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
+            <DirectionButton
+              label="←"
+              direction="LEFT"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
 
+            <Pressable
+              style={styles.stopButton}
+              onPress={emergencyStop}
+            >
+              <Text style={styles.stopText}>STOP</Text>
+            </Pressable>
+
+            <DirectionButton
+              label="→"
+              direction="RIGHT"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
+
+            <DirectionButton
+              label="↙"
+              direction="BACKWARD_LEFT"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
+
+            <DirectionButton
+              label="↓"
+              direction="BACKWARD"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
+
+            <DirectionButton
+              label="↘"
+              direction="BACKWARD_RIGHT"
+              onPressIn={setDirection}
+              onPressOut={() => setDirection('STOP')}
+            />
+          </View>
+
+          <View style={styles.currentDirection}>
+            <Text style={styles.currentDirectionLabel}>
+              CURRENT DIRECTION
+            </Text>
+            <Text style={styles.currentDirectionValue}>
+              {direction}
+            </Text>
+          </View>
+        </View>
+
+        {/* RIGHT: MOTOR + FUNCTIONS */}
+        <View
+          style={[
+            styles.rightPanel,
+            isLandscape && styles.landscapeRightPanel,
+          ]}
+        >
+          {/* MOTOR SPEED */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              MOTOR SPEED CONTROL
+            </Text>
+
+            <MotorSpeedControl
+              motorName="MOTOR 1"
+              speed={motor1Speed}
+              onSpeedChange={setMotor1Speed}
+            />
+
+            <MotorSpeedControl
+              motorName="MOTOR 2"
+              speed={motor2Speed}
+              onSpeedChange={setMotor2Speed}
+            />
+          </View>
+
+          {/* FUNCTION BUTTONS */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>FUNCTIONS</Text>
+
+            <View style={styles.functionRow}>
+              <Pressable
+                style={[
+                  styles.functionButton,
+                  function1 && styles.functionActive,
+                ]}
+                onPress={() => setFunction1(!function1)}
+              >
+                <Text style={styles.functionText}>FUNCTION 1</Text>
+                <Text style={styles.functionState}>
+                  {function1 ? 'ON' : 'OFF'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.functionButton,
+                  function2 && styles.functionActive,
+                ]}
+                onPress={() => setFunction2(!function2)}
+              >
+                <Text style={styles.functionText}>FUNCTION 2</Text>
+                <Text style={styles.functionState}>
+                  {function2 ? 'ON' : 'OFF'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* EMERGENCY STOP */}
           <Pressable
-            style={styles.stopButton}
+            style={styles.emergencyButton}
             onPress={emergencyStop}
           >
-            <Text style={styles.stopText}>STOP</Text>
-          </Pressable>
-
-          <DirectionButton
-            label="→"
-            direction="RIGHT"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
-
-          <DirectionButton
-            label="↙"
-            direction="BACKWARD_LEFT"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
-
-          <DirectionButton
-            label="↓"
-            direction="BACKWARD"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
-
-          <DirectionButton
-            label="↘"
-            direction="BACKWARD_RIGHT"
-            onPressIn={setDirection}
-            onPressOut={() => setDirection('STOP')}
-          />
-        </View>
-
-        <View style={styles.currentDirection}>
-          <Text style={styles.currentDirectionLabel}>
-            CURRENT DIRECTION
-          </Text>
-          <Text style={styles.currentDirectionValue}>
-            {direction}
-          </Text>
-        </View>
-      </View>
-
-      {/* MOTOR SPEED */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>MOTOR SPEED CONTROL</Text>
-
-        <MotorSpeedControl
-          motorName="MOTOR 1"
-          speed={motor1Speed}
-          onDecrease={() =>
-            changeSpeed(motor1Speed, setMotor1Speed, -5)
-          }
-          onIncrease={() =>
-            changeSpeed(motor1Speed, setMotor1Speed, 5)
-          }
-        />
-
-        <MotorSpeedControl
-          motorName="MOTOR 2"
-          speed={motor2Speed}
-          onDecrease={() =>
-            changeSpeed(motor2Speed, setMotor2Speed, -5)
-          }
-          onIncrease={() =>
-            changeSpeed(motor2Speed, setMotor2Speed, 5)
-          }
-        />
-      </View>
-
-      {/* FUNCTION BUTTONS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>FUNCTIONS</Text>
-
-        <View style={styles.functionRow}>
-          <Pressable
-            style={[
-              styles.functionButton,
-              function1 && styles.functionActive,
-            ]}
-            onPress={() => setFunction1(!function1)}
-          >
-            <Text style={styles.functionText}>FUNCTION 1</Text>
-            <Text style={styles.functionState}>
-              {function1 ? 'ON' : 'OFF'}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.functionButton,
-              function2 && styles.functionActive,
-            ]}
-            onPress={() => setFunction2(!function2)}
-          >
-            <Text style={styles.functionText}>FUNCTION 2</Text>
-            <Text style={styles.functionState}>
-              {function2 ? 'ON' : 'OFF'}
+            <Text style={styles.emergencyText}>
+              EMERGENCY STOP
             </Text>
           </Pressable>
         </View>
       </View>
-
-      {/* EMERGENCY STOP */}
-      <Pressable
-        style={styles.emergencyButton}
-        onPress={emergencyStop}
-      >
-        <Text style={styles.emergencyText}>EMERGENCY STOP</Text>
-      </Pressable>
 
       <Text style={styles.footer}>
         ROBOT CONTROLLER • MVP 1.0
@@ -312,11 +321,15 @@ const styles = StyleSheet.create({
     paddingTop: 55,
     paddingBottom: 40,
   },
+  landscapeContainer: {
+    paddingTop: 25,
+    paddingHorizontal: 24,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   title: {
     color: '#FFFFFF',
@@ -349,33 +362,57 @@ const styles = StyleSheet.create({
   },
   connectionCard: {
     backgroundColor: '#1E293B',
-    padding: 16,
+    padding: 14,
     borderRadius: 14,
+    marginBottom: 22,
+  },
+  connectionText: {
+    color: '#FCA5A5',
+    fontSize: 14,
+  },
+  mainLayout: {
+    width: '100%',
+  },
+  portraitLayout: {
+    flexDirection: 'column',
+  },
+  landscapeLayout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 20,
+  },
+  movementSection: {
     marginBottom: 25,
   },
+  landscapeMovement: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  rightPanel: {
+    width: '100%',
+  },
+  landscapeRightPanel: {
+    flex: 1,
+  },
   section: {
-    marginBottom: 25,
+    marginBottom: 22,
   },
   sectionTitle: {
     color: '#94A3B8',
     fontSize: 13,
     fontWeight: 'bold',
     letterSpacing: 1,
-    marginBottom: 15,
-  },
-  connectionText: {
-    color: '#FCA5A5',
-    fontSize: 14,
+    marginBottom: 13,
   },
   directionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
   },
   directionButton: {
     width: '30%',
-    height: 75,
+    height: 70,
     backgroundColor: '#253449',
     borderRadius: 15,
     justifyContent: 'center',
@@ -390,7 +427,7 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     width: '30%',
-    height: 75,
+    height: 70,
     backgroundColor: '#7F1D1D',
     borderRadius: 15,
     justifyContent: 'center',
@@ -402,8 +439,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   currentDirection: {
-    marginTop: 15,
-    padding: 14,
+    marginTop: 14,
+    padding: 13,
     backgroundColor: '#1E293B',
     borderRadius: 12,
     alignItems: 'center',
@@ -420,9 +457,9 @@ const styles = StyleSheet.create({
   },
   motorCard: {
     backgroundColor: '#1E293B',
-    padding: 16,
+    padding: 14,
     borderRadius: 14,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   motorHeader: {
     flexDirection: 'row',
@@ -439,48 +476,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  progressBackground: {
-    height: 8,
-    backgroundColor: '#334155',
-    borderRadius: 10,
-    marginTop: 15,
-    overflow: 'hidden',
+  slider: {
+    width: '100%',
+    height: 35,
+    marginTop: 8,
   },
-  progressFill: {
-    height: 8,
-    backgroundColor: '#3B82F6',
-    borderRadius: 10,
-  },
-  speedControls: {
+  sliderLabels: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
   },
-  adjustButton: {
-    backgroundColor: '#334155',
-    width: 42,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  adjustText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-  },
-  speedDescription: {
+  sliderLabel: {
     color: '#94A3B8',
-    fontSize: 12,
+    fontSize: 10,
   },
   functionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   functionButton: {
     flex: 1,
     backgroundColor: '#253449',
-    padding: 17,
+    padding: 14,
     borderRadius: 13,
     alignItems: 'center',
   },
@@ -489,7 +505,7 @@ const styles = StyleSheet.create({
   },
   functionText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   functionState: {
@@ -499,7 +515,7 @@ const styles = StyleSheet.create({
   },
   emergencyButton: {
     backgroundColor: '#DC2626',
-    padding: 18,
+    padding: 16,
     borderRadius: 14,
     alignItems: 'center',
     marginBottom: 20,
@@ -507,12 +523,13 @@ const styles = StyleSheet.create({
   emergencyText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 15,
+    fontSize: 14,
     letterSpacing: 1,
   },
   footer: {
     color: '#64748B',
     textAlign: 'center',
     fontSize: 10,
+    marginTop: 5,
   },
 });

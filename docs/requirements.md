@@ -1,0 +1,6 @@
+- Hỗ trợ Android và iOS.
+- Điều khiển trong khoảng 5–6 m.
+- Di chuyển 8 hướng, bao gồm đường chéo.
+- Điều chỉnh tốc độ.
+- 2–3 nút chức năng.
+- Không sử dụng camera.

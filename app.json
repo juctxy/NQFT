@@ -3,7 +3,7 @@
     "name": "NQFT-expo-temp",
     "slug": "NQFT-expo-temp",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {

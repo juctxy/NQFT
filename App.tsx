@@ -10,10 +10,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useState } from 'react';
-import {
-  SafeAreaProvider,
-  SafeAreaView,
-} from 'react-native-safe-area-context';
 
 // 1. Kiểu dữ liệu cho 4 nút điều hướng
 type DirectionInput = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
@@ -45,33 +41,42 @@ function ControlButton({
   onPressOut,
   size,
 }: ControlButtonProps) {
+  const [isPressed, setIsPressed] = useState(false);
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Move ${direction.toLowerCase()}`}
-      onPressIn={() => onPressIn(direction)}
-      onPressOut={() => onPressOut(direction)}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.controlButton,
         { width: size, height: size },
-        pressed && styles.controlButtonPressed,
+        isPressed && styles.controlButtonPressed,
       ]}
+      onTouchStart={() => {
+        setIsPressed(true);
+        onPressIn(direction);
+      }}
+      onTouchEnd={() => {
+        setIsPressed(false);
+        onPressOut(direction);
+      }}
+      onTouchCancel={() => {
+        setIsPressed(false);
+        onPressOut(direction);
+      }}
     >
-      {({ pressed }) => (
-        <View
-          style={[
-            styles.controlButtonInner,
-            pressed && styles.controlButtonInnerPressed,
-          ]}
-        >
-          <Ionicons
-            name={iconName}
-            size={Math.floor(size * 0.42)}
-            color={pressed ? '#FFFFFF' : '#7DD3FC'}
-          />
-        </View>
-      )}
-    </Pressable>
+      {/* Vòng viền phụ bên trong tạo cảm giác nút bấm cơ khí/công nghệ */}
+      <View
+        style={[
+          styles.controlButtonInner,
+          isPressed && styles.controlButtonInnerPressed,
+        ]}
+      >
+        <Ionicons
+          name={iconName}
+          size={Math.floor(size * 0.42)}
+          color={isPressed ? '#FFFFFF' : '#7DD3FC'}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -207,7 +212,7 @@ export default function App() {
 
   const buttonSize = Math.min(
     145,
-    Math.max(64, Math.floor(Math.min(width, height) * 0.22)),
+    Math.max(85, Math.floor(Math.min(width, height) * 0.18)),
   );
 
   const [pressedDirections, setPressedDirections] = useState<DirectionInput[]>(
@@ -258,133 +263,140 @@ export default function App() {
   const currentDirection = getCurrentDirection();
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.screen}>
-        <StatusBar style="light" />
+    <View style={styles.screen}>
+      {/* Đổi sang light để icon giờ/pin của điện thoại nổi trên nền tối */}
+      <StatusBar style="light" />
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          bounces={false}
-        >
-          <View style={styles.controlPanel}>
-            <View style={styles.topBar}>
-              <Pressable
-                onPress={() => setFunc1Active(!func1Active)}
-                style={({ pressed }) => [
-                  styles.topButton,
-                  func1Active && styles.topButtonActive,
-                  pressed && styles.topButtonPressed,
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        bounces={false}
+      >
+        {/* KHUNG ĐIỀU KHIỂN CHÍNH */}
+        <View style={styles.controlPanel}>
+          {/* THANH TRÊN: 2 FUNCTION + BLUETOOTH */}
+          <View style={styles.topBar}>
+            <Pressable
+              onPress={() => setFunc1Active(!func1Active)}
+              style={({ pressed }) => [
+                styles.topButton,
+                func1Active && styles.topButtonActive,
+                pressed && styles.topButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name={func1Active ? 'flash' : 'flash-outline'}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.topButtonText}>FUNC 1</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setFunc2Active(!func2Active)}
+              style={({ pressed }) => [
+                styles.topButton,
+                func2Active && styles.topButtonActive,
+                pressed && styles.topButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name={func2Active ? 'aperture' : 'aperture-outline'}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.topButtonText}>FUNC 2</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setBtConnected(!btConnected)}
+              style={({ pressed }) => [
+                styles.topButton,
+                btConnected ? styles.btButtonConnected : styles.btButtonDisconnected,
+                pressed && styles.topButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name="bluetooth"
+                size={16}
+                color={btConnected ? '#FFFFFF' : '#94A3B8'}
+              />
+              <Text
+                style={[
+                  styles.topButtonText,
+                  !btConnected && { color: '#CBD5E1' },
                 ]}
               >
-                <Ionicons
-                  name={func1Active ? 'flash' : 'flash-outline'}
-                  size={16}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.topButtonText}>FUNC 1</Text>
-              </Pressable>
+                {btConnected ? 'CONNECTED' : 'BLUETOOTH'}
+              </Text>
+            </Pressable>
+          </View>
 
-              <Pressable
-                onPress={() => setFunc2Active(!func2Active)}
-                style={({ pressed }) => [
-                  styles.topButton,
-                  func2Active && styles.topButtonActive,
-                  pressed && styles.topButtonPressed,
-                ]}
-              >
-                <Ionicons
-                  name={func2Active ? 'aperture' : 'aperture-outline'}
-                  size={16}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.topButtonText}>FUNC 2</Text>
-              </Pressable>
+          {/* KHU VỰC ĐIỀU KHIỂN */}
+          <View style={styles.mainControl}>
+            {/* BÊN TRÁI: UP / DOWN */}
+            <View style={styles.verticalControls}>
+              <ControlButton
+                iconName="caret-up"
+                direction="UP"
+                size={buttonSize}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+              />
 
-              <Pressable
-                onPress={() => setBtConnected(!btConnected)}
-                style={({ pressed }) => [
-                  styles.topButton,
-                  btConnected ? styles.btButtonConnected : styles.btButtonDisconnected,
-                  pressed && styles.topButtonPressed,
-                ]}
-              >
-                <Ionicons
-                  name="bluetooth"
-                  size={16}
-                  color={btConnected ? '#FFFFFF' : '#94A3B8'}
-                />
-                <Text
-                  style={[
-                    styles.topButtonText,
-                    !btConnected && { color: '#CBD5E1' },
-                  ]}
-                >
-                  {btConnected ? 'CONNECTED' : 'BLUETOOTH'}
-                </Text>
-              </Pressable>
+              <ControlButton
+                iconName="caret-down"
+                direction="DOWN"
+                size={buttonSize}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+              />
             </View>
 
-            <View style={styles.mainControl}>
-              <View style={styles.verticalControls}>
+            {/* CHÍNH GIỮA: HIỂN THỊ 8 HƯỚNG DẠNG RADAR */}
+            <View style={styles.centerIndicator}>
+              <DirectionIndicator direction={currentDirection} />
+            </View>
+
+            {/* BÊN PHẢI: SLIDER + LEFT / RIGHT */}
+            <View style={styles.rightControls}>
+              {/* MOTOR SPEED */}
+              <View style={styles.motorControls}>
+                <MotorSlider
+                  motorName="MOTOR L (1)"
+                  speed={motor1Speed}
+                  onSpeedChange={setMotor1Speed}
+                />
+
+                <MotorSlider
+                  motorName="MOTOR R (2)"
+                  speed={motor2Speed}
+                  onSpeedChange={setMotor2Speed}
+                />
+              </View>
+
+              {/* LEFT / RIGHT */}
+              <View style={styles.horizontalControls}>
                 <ControlButton
-                  iconName="caret-up"
-                  direction="UP"
+                  iconName="caret-back"
+                  direction="LEFT"
                   size={buttonSize}
                   onPressIn={handlePressIn}
                   onPressOut={handlePressOut}
                 />
 
                 <ControlButton
-                  iconName="caret-down"
-                  direction="DOWN"
+                  iconName="caret-forward"
+                  direction="RIGHT"
                   size={buttonSize}
                   onPressIn={handlePressIn}
                   onPressOut={handlePressOut}
                 />
-              </View>
-
-              <View style={styles.centerIndicator}>
-                <DirectionIndicator direction={currentDirection} />
-              </View>
-
-              <View style={styles.rightControls}>
-                <View style={styles.motorControls}>
-                  <MotorSlider
-                    motorName="MOTOR L (1)"
-                    speed={motor1Speed}
-                    onSpeedChange={setMotor1Speed}
-                  />
-
-                  <MotorSlider
-                    motorName="MOTOR R (2)"
-                    speed={motor2Speed}
-                    onSpeedChange={setMotor2Speed}
-                  />
-                </View>
-
-                <View style={styles.horizontalControls}>
-                  <ControlButton
-                    iconName="caret-back"
-                    direction="LEFT"
-                    size={buttonSize}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                  />
-
-                  <ControlButton
-                    iconName="caret-forward"
-                    direction="RIGHT"
-                    size={buttonSize}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                  />
-                </View>
               </View>
             </View>
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </SafeAreaProvider>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -398,13 +410,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    padding: 14,
   },
 
   controlPanel: {
     width: '100%',
-    minHeight: 260,
+    minHeight: 360,
     borderWidth: 1.5,
     borderColor: '#1E3A5F',
     borderRadius: 20,
@@ -419,22 +430,22 @@ const styles = StyleSheet.create({
 
   // TOP BAR
   topBar: {
-    minHeight: 50,
+    minHeight: 68,
     borderBottomWidth: 1.5,
     borderBottomColor: '#1E3A5F',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 3,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: '#0D192B',
   },
 
   topButton: {
     flex: 1,
     maxWidth: 185,
-    height: 44,
+    height: 42,
     backgroundColor: '#065F46', // Xanh lá đậm công nghệ
     borderWidth: 1.5,
     borderColor: '#10B981',
@@ -484,19 +495,20 @@ const styles = StyleSheet.create({
   // MAIN CONTROL
   mainControl: {
     flex: 1,
-    minHeight: 210,
+    minHeight: 290,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    gap: 8,
   },
 
+  // UP / DOWN
   verticalControls: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-evenly',
-    gap: 8,
+    gap: 14,
   },
 
   controlButton: {
@@ -541,7 +553,6 @@ const styles = StyleSheet.create({
   // DIRECTION INDICATOR (RADAR HUD)
   centerIndicator: {
     flex: 1.25,
-    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -618,16 +629,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
+  // RIGHT PANEL
   rightControls: {
     flex: 2,
-    minWidth: 0,
     justifyContent: 'space-evenly',
-    gap: 6,
+    gap: 8,
   },
 
   motorControls: {
     width: '100%',
-    gap: 6,
+    gap: 8,
   },
 
   motorCard: {
@@ -636,8 +647,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#1E3A5F',
     borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
 
   motorHeader: {
@@ -679,7 +690,7 @@ const styles = StyleSheet.create({
 
   slider: {
     width: '100%',
-    height: 22,
+    height: 24,
   },
 
   sliderLabels: {
@@ -693,11 +704,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  // LEFT / RIGHT
   horizontalControls: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: 24,
+    marginTop: 4,
   },
-
 });

@@ -8,6 +8,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+coverage/
 
 # Native
 .kotlin/
@@ -22,16 +23,24 @@ expo-env.d.ts
 .metro-health-check*
 
 # debug
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# operating systems
 .DS_Store
-*.pem
+Thumbs.db
+Desktop.ini
 
-# local env files
-.env*.local
+# credentials and local environment
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+
+# certificates
+*.pem
 
 # typescript
 *.tsbuildinfo

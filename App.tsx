@@ -410,12 +410,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 14,
+    padding: 8,
   },
 
   controlPanel: {
     width: '100%',
-    minHeight: 360,
+    flex: 1,
+    minHeight: 0,
     borderWidth: 1.5,
     borderColor: '#1E3A5F',
     borderRadius: 20,
@@ -430,7 +431,7 @@ const styles = StyleSheet.create({
 
   // TOP BAR
   topBar: {
-    minHeight: 68,
+    minHeight: 60,
     borderBottomWidth: 1.5,
     borderBottomColor: '#1E3A5F',
     flexDirection: 'row',
@@ -438,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: '#0D192B',
   },
 
@@ -495,11 +496,11 @@ const styles = StyleSheet.create({
   // MAIN CONTROL
   mainControl: {
     flex: 1,
-    minHeight: 290,
+    minHeight: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 16,
+    paddingVertical: 8,
     gap: 8,
   },
 
@@ -648,7 +649,7 @@ const styles = StyleSheet.create({
     borderColor: '#1E3A5F',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
 
   motorHeader: {

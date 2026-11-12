@@ -76,7 +76,7 @@ npx expo start --tunnel
 - **Điều chỉnh tốc độ:** Tùy chỉnh độc lập cho **Motor 1** và **Motor 2** (phạm vi `0 – 255`).
 - **Tính năng mở rộng:** 2 nút Function sẵn sàng cho các lệnh bổ sung.
 - **Kết nối Bluetooth:** Giao diện sẵn sàng cho việc ghép nối thiết bị thực tế.
-- **Tối ưu hiển thị:** Hỗ trợ cả xoay ngang (landscape) và xoay dọc (portrait).
+- **Tối ưu hiển thị:** Hỗ trợ xoay ngang (landscape) .
 
 ---
 

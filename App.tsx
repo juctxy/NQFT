@@ -1,6 +1,6 @@
-
 import { StatusBar } from 'expo-status-bar';
 import Slider from '@react-native-community/slider';
+import { Ionicons } from '@expo/vector-icons';
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { useState } from 'react';
 
-// 1. Các hướng di chuyển
+// 1. Kiểu dữ liệu cho 4 nút điều hướng
+type DirectionInput = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+
 type Direction =
   | 'FORWARD'
   | 'BACKWARD'
@@ -23,23 +25,165 @@ type Direction =
   | 'BACKWARD_RIGHT'
   | 'STOP';
 
-// 2. Component điều chỉnh tốc độ motor bằng Slider
-type MotorSpeedControlProps = {
+// 2. Component nút điều hướng
+type ControlButtonProps = {
+  iconName: keyof typeof Ionicons.glyphMap;
+  direction: DirectionInput;
+  onPressIn: (direction: DirectionInput) => void;
+  onPressOut: (direction: DirectionInput) => void;
+  size: number;
+};
+
+function ControlButton({
+  iconName,
+  direction,
+  onPressIn,
+  onPressOut,
+  size,
+}: ControlButtonProps) {
+  const [isPressed, setIsPressed] = useState(false);
+
+  return (
+    <View
+      style={[
+        styles.controlButton,
+        { width: size, height: size },
+        isPressed && styles.controlButtonPressed,
+      ]}
+      onTouchStart={() => {
+        setIsPressed(true);
+        onPressIn(direction);
+      }}
+      onTouchEnd={() => {
+        setIsPressed(false);
+        onPressOut(direction);
+      }}
+      onTouchCancel={() => {
+        setIsPressed(false);
+        onPressOut(direction);
+      }}
+    >
+      {/* Vòng viền phụ bên trong tạo cảm giác nút bấm cơ khí/công nghệ */}
+      <View
+        style={[
+          styles.controlButtonInner,
+          isPressed && styles.controlButtonInnerPressed,
+        ]}
+      >
+        <Ionicons
+          name={iconName}
+          size={Math.floor(size * 0.42)}
+          color={isPressed ? '#FFFFFF' : '#7DD3FC'}
+        />
+      </View>
+    </View>
+  );
+}
+
+// 3. Component hiển thị 8 hướng di chuyển (Dạng Radar HUD)
+type DirectionIndicatorProps = {
+  direction: Direction;
+};
+
+function DirectionIndicator({ direction }: DirectionIndicatorProps) {
+  const arrows: {
+    iconName: keyof typeof Ionicons.glyphMap;
+    direction: Direction;
+  }[] = [
+    { iconName: 'arrow-up-outline', direction: 'FORWARD_LEFT' }, // Sẽ xoay -45 độ
+    { iconName: 'arrow-up-outline', direction: 'FORWARD' },
+    { iconName: 'arrow-up-outline', direction: 'FORWARD_RIGHT' }, // Sẽ xoay 45 độ
+    { iconName: 'arrow-back-outline', direction: 'LEFT' },
+    { iconName: 'radio-button-on', direction: 'STOP' },
+    { iconName: 'arrow-forward-outline', direction: 'RIGHT' },
+    { iconName: 'arrow-down-outline', direction: 'BACKWARD_LEFT' }, // Sẽ xoay 45 độ
+    { iconName: 'arrow-down-outline', direction: 'BACKWARD' },
+    { iconName: 'arrow-down-outline', direction: 'BACKWARD_RIGHT' }, // Sẽ xoay -45 độ
+  ];
+
+  const getRotation = (dir: Direction) => {
+    switch (dir) {
+      case 'FORWARD_LEFT':
+      case 'BACKWARD_RIGHT':
+        return '-45deg';
+      case 'FORWARD_RIGHT':
+      case 'BACKWARD_LEFT':
+        return '45deg';
+      default:
+        return '0deg';
+    }
+  };
+
+  return (
+    <View style={styles.radarContainer}>
+      {/* Vòng tròn định vị bên ngoài */}
+      <View style={styles.radarOuterRing}>
+        <View style={styles.indicatorGrid}>
+          {arrows.map((item, index) => {
+            const isActive = direction === item.direction;
+            const isCenter = item.direction === 'STOP';
+
+            return (
+              <View key={index} style={styles.indicatorCell}>
+                <View
+                  style={[
+                    styles.arrowWrapper,
+                    isActive && !isCenter && styles.arrowWrapperActive,
+                    isCenter && isActive && styles.centerWrapperActive,
+                    { transform: [{ rotate: getRotation(item.direction) }] },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.iconName}
+                    size={isCenter ? 22 : 24}
+                    color={
+                      isActive
+                        ? isCenter
+                          ? '#F59E0B' // Tâm sáng cam khi STOP
+                          : '#22D3EE' // Hướng sáng Cyan rực rỡ
+                        : '#47698F' // Tăng độ sáng màu nền để không bị chìm
+                    }
+                  />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Nhãn hiển thị trạng thái lệnh Telemetry */}
+      <View style={styles.statusBadge}>
+        <Text style={styles.statusBadgeText}>CMD: {direction}</Text>
+      </View>
+    </View>
+  );
+}
+
+// 4. Component điều chỉnh tốc độ motor
+type MotorSliderProps = {
   motorName: string;
   speed: number;
   onSpeedChange: (value: number) => void;
 };
 
-function MotorSpeedControl({
+function MotorSlider({
   motorName,
   speed,
   onSpeedChange,
-}: MotorSpeedControlProps) {
+}: MotorSliderProps) {
+  const percentage = Math.round((speed / 255) * 100);
+
   return (
     <View style={styles.motorCard}>
       <View style={styles.motorHeader}>
-        <Text style={styles.motorName}>{motorName}</Text>
-        <Text style={styles.speedValue}>{speed}/255</Text>
+        <View style={styles.motorTitleRow}>
+          <Ionicons name="speedometer-outline" size={14} color="#38BDF8" />
+          <Text style={styles.motorName}>{motorName}</Text>
+        </View>
+        <View style={styles.speedBadge}>
+          <Text style={styles.speedValue}>{speed}</Text>
+          <Text style={styles.speedUnit}>PWM ({percentage}%)</Text>
+        </View>
       </View>
 
       <Slider
@@ -48,488 +192,524 @@ function MotorSpeedControl({
         maximumValue={255}
         step={1}
         value={speed}
-        onValueChange={onSpeedChange}
-        minimumTrackTintColor="#3B82F6"
-        maximumTrackTintColor="#334155"
-        thumbTintColor="#60A5FA"
+        onValueChange={(value) => onSpeedChange(Math.round(value))}
+        minimumTrackTintColor="#06B6D4"
+        maximumTrackTintColor="#1E3A5F"
+        thumbTintColor="#22D3EE"
       />
 
       <View style={styles.sliderLabels}>
-        <Text style={styles.sliderLabel}>0</Text>
-        <Text style={styles.sliderLabel}>255</Text>
+        <Text style={styles.sliderLabel}>MIN: 0</Text>
+        <Text style={styles.sliderLabel}>MAX: 255</Text>
       </View>
     </View>
   );
 }
 
-// 3. Component nút điều khiển hướng
-type DirectionButtonProps = {
-  label: string;
-  direction: Direction;
-  onPressIn: (direction: Direction) => void;
-  onPressOut: () => void;
-};
-
-function DirectionButton({
-  label,
-  direction,
-  onPressIn,
-  onPressOut,
-}: DirectionButtonProps) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.directionButton,
-        pressed && styles.directionButtonPressed,
-      ]}
-      onPressIn={() => onPressIn(direction)}
-      onPressOut={onPressOut}
-    >
-      <Text style={styles.directionText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-// 4. Component chính
+// 5. Ứng dụng chính
 export default function App() {
   const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
 
-  const [direction, setDirection] = useState<Direction>('STOP');
+  const buttonSize = Math.min(
+    145,
+    Math.max(85, Math.floor(Math.min(width, height) * 0.18)),
+  );
 
+  const [pressedDirections, setPressedDirections] = useState<DirectionInput[]>(
+    [],
+  );
   const [motor1Speed, setMotor1Speed] = useState(128);
   const [motor2Speed, setMotor2Speed] = useState(128);
 
-  const [function1, setFunction1] = useState(false);
-  const [function2, setFunction2] = useState(false);
+  // State giả lập cho các nút trên Top Bar
+  const [func1Active, setFunc1Active] = useState(false);
+  const [func2Active, setFunc2Active] = useState(false);
+  const [btConnected, setBtConnected] = useState(false);
 
-  // Dừng robot
-  const emergencyStop = () => {
-    setDirection('STOP');
+  const handlePressIn = (input: DirectionInput) => {
+    setPressedDirections((previous) =>
+      previous.includes(input) ? previous : [...previous, input],
+    );
   };
 
+  const handlePressOut = (input: DirectionInput) => {
+    setPressedDirections((previous) =>
+      previous.filter((item) => item !== input),
+    );
+  };
+
+  const getCurrentDirection = (): Direction => {
+    const up = pressedDirections.includes('UP');
+    const down = pressedDirections.includes('DOWN');
+    const left = pressedDirections.includes('LEFT');
+    const right = pressedDirections.includes('RIGHT');
+
+    const vertical = up === down ? null : up ? 'FORWARD' : 'BACKWARD';
+    const horizontal = left === right ? null : left ? 'LEFT' : 'RIGHT';
+
+    if (vertical === 'FORWARD' && horizontal === 'LEFT') return 'FORWARD_LEFT';
+    if (vertical === 'FORWARD' && horizontal === 'RIGHT') return 'FORWARD_RIGHT';
+    if (vertical === 'BACKWARD' && horizontal === 'LEFT') return 'BACKWARD_LEFT';
+    if (vertical === 'BACKWARD' && horizontal === 'RIGHT') return 'BACKWARD_RIGHT';
+
+    if (vertical === 'FORWARD') return 'FORWARD';
+    if (vertical === 'BACKWARD') return 'BACKWARD';
+    if (horizontal === 'LEFT') return 'LEFT';
+    if (horizontal === 'RIGHT') return 'RIGHT';
+
+    return 'STOP';
+  };
+
+  const currentDirection = getCurrentDirection();
+
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[
-        styles.container,
-        isLandscape && styles.landscapeContainer,
-      ]}
-    >
+    <View style={styles.screen}>
+      {/* Đổi sang light để icon giờ/pin của điện thoại nổi trên nền tối */}
       <StatusBar style="light" />
 
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>ROBOT CONTROLLER</Text>
-          <Text style={styles.subtitle}>Robot Control System</Text>
-        </View>
-
-        <View style={styles.statusBadge}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>OFFLINE</Text>
-        </View>
-      </View>
-
-      {/* CONNECTION STATUS */}
-      <View style={styles.connectionCard}>
-        <Text style={styles.sectionTitle}>CONNECTION</Text>
-        <Text style={styles.connectionText}>
-          Robot is not connected
-        </Text>
-      </View>
-
-      {/* MAIN RESPONSIVE LAYOUT */}
-      <View
-        style={[
-          styles.mainLayout,
-          isLandscape
-            ? styles.landscapeLayout
-            : styles.portraitLayout,
-        ]}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        bounces={false}
       >
-        {/* LEFT: MOVEMENT CONTROL */}
-        <View
-          style={[
-            styles.movementSection,
-            isLandscape && styles.landscapeMovement,
-          ]}
-        >
-          <Text style={styles.sectionTitle}>MOVEMENT CONTROL</Text>
-
-          <View style={styles.directionGrid}>
-            <DirectionButton
-              label="↖"
-              direction="FORWARD_LEFT"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-
-            <DirectionButton
-              label="↑"
-              direction="FORWARD"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-
-            <DirectionButton
-              label="↗"
-              direction="FORWARD_RIGHT"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-
-            <DirectionButton
-              label="←"
-              direction="LEFT"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-
+        {/* KHUNG ĐIỀU KHIỂN CHÍNH */}
+        <View style={styles.controlPanel}>
+          {/* THANH TRÊN: 2 FUNCTION + BLUETOOTH */}
+          <View style={styles.topBar}>
             <Pressable
-              style={styles.stopButton}
-              onPress={emergencyStop}
+              onPress={() => setFunc1Active(!func1Active)}
+              style={({ pressed }) => [
+                styles.topButton,
+                func1Active && styles.topButtonActive,
+                pressed && styles.topButtonPressed,
+              ]}
             >
-              <Text style={styles.stopText}>STOP</Text>
+              <Ionicons
+                name={func1Active ? 'flash' : 'flash-outline'}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.topButtonText}>FUNC 1</Text>
             </Pressable>
 
-            <DirectionButton
-              label="→"
-              direction="RIGHT"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
+            <Pressable
+              onPress={() => setFunc2Active(!func2Active)}
+              style={({ pressed }) => [
+                styles.topButton,
+                func2Active && styles.topButtonActive,
+                pressed && styles.topButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name={func2Active ? 'aperture' : 'aperture-outline'}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.topButtonText}>FUNC 2</Text>
+            </Pressable>
 
-            <DirectionButton
-              label="↙"
-              direction="BACKWARD_LEFT"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-
-            <DirectionButton
-              label="↓"
-              direction="BACKWARD"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-
-            <DirectionButton
-              label="↘"
-              direction="BACKWARD_RIGHT"
-              onPressIn={setDirection}
-              onPressOut={() => setDirection('STOP')}
-            />
-          </View>
-
-          <View style={styles.currentDirection}>
-            <Text style={styles.currentDirectionLabel}>
-              CURRENT DIRECTION
-            </Text>
-            <Text style={styles.currentDirectionValue}>
-              {direction}
-            </Text>
-          </View>
-        </View>
-
-        {/* RIGHT: MOTOR + FUNCTIONS */}
-        <View
-          style={[
-            styles.rightPanel,
-            isLandscape && styles.landscapeRightPanel,
-          ]}
-        >
-          {/* MOTOR SPEED */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              MOTOR SPEED CONTROL
-            </Text>
-
-            <MotorSpeedControl
-              motorName="MOTOR 1"
-              speed={motor1Speed}
-              onSpeedChange={setMotor1Speed}
-            />
-
-            <MotorSpeedControl
-              motorName="MOTOR 2"
-              speed={motor2Speed}
-              onSpeedChange={setMotor2Speed}
-            />
-          </View>
-
-          {/* FUNCTION BUTTONS */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>FUNCTIONS</Text>
-
-            <View style={styles.functionRow}>
-              <Pressable
+            <Pressable
+              onPress={() => setBtConnected(!btConnected)}
+              style={({ pressed }) => [
+                styles.topButton,
+                btConnected ? styles.btButtonConnected : styles.btButtonDisconnected,
+                pressed && styles.topButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name="bluetooth"
+                size={16}
+                color={btConnected ? '#FFFFFF' : '#94A3B8'}
+              />
+              <Text
                 style={[
-                  styles.functionButton,
-                  function1 && styles.functionActive,
+                  styles.topButtonText,
+                  !btConnected && { color: '#CBD5E1' },
                 ]}
-                onPress={() => setFunction1(!function1)}
               >
-                <Text style={styles.functionText}>FUNCTION 1</Text>
-                <Text style={styles.functionState}>
-                  {function1 ? 'ON' : 'OFF'}
-                </Text>
-              </Pressable>
+                {btConnected ? 'CONNECTED' : 'BLUETOOTH'}
+              </Text>
+            </Pressable>
+          </View>
 
-              <Pressable
-                style={[
-                  styles.functionButton,
-                  function2 && styles.functionActive,
-                ]}
-                onPress={() => setFunction2(!function2)}
-              >
-                <Text style={styles.functionText}>FUNCTION 2</Text>
-                <Text style={styles.functionState}>
-                  {function2 ? 'ON' : 'OFF'}
-                </Text>
-              </Pressable>
+          {/* KHU VỰC ĐIỀU KHIỂN */}
+          <View style={styles.mainControl}>
+            {/* BÊN TRÁI: UP / DOWN */}
+            <View style={styles.verticalControls}>
+              <ControlButton
+                iconName="caret-up"
+                direction="UP"
+                size={buttonSize}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+              />
+
+              <ControlButton
+                iconName="caret-down"
+                direction="DOWN"
+                size={buttonSize}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+              />
+            </View>
+
+            {/* CHÍNH GIỮA: HIỂN THỊ 8 HƯỚNG DẠNG RADAR */}
+            <View style={styles.centerIndicator}>
+              <DirectionIndicator direction={currentDirection} />
+            </View>
+
+            {/* BÊN PHẢI: SLIDER + LEFT / RIGHT */}
+            <View style={styles.rightControls}>
+              {/* MOTOR SPEED */}
+              <View style={styles.motorControls}>
+                <MotorSlider
+                  motorName="MOTOR L (1)"
+                  speed={motor1Speed}
+                  onSpeedChange={setMotor1Speed}
+                />
+
+                <MotorSlider
+                  motorName="MOTOR R (2)"
+                  speed={motor2Speed}
+                  onSpeedChange={setMotor2Speed}
+                />
+              </View>
+
+              {/* LEFT / RIGHT */}
+              <View style={styles.horizontalControls}>
+                <ControlButton
+                  iconName="caret-back"
+                  direction="LEFT"
+                  size={buttonSize}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                />
+
+                <ControlButton
+                  iconName="caret-forward"
+                  direction="RIGHT"
+                  size={buttonSize}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                />
+              </View>
             </View>
           </View>
-
-          {/* EMERGENCY STOP */}
-          <Pressable
-            style={styles.emergencyButton}
-            onPress={emergencyStop}
-          >
-            <Text style={styles.emergencyText}>
-              EMERGENCY STOP
-            </Text>
-          </Pressable>
         </View>
-      </View>
-
-      <Text style={styles.footer}>
-        ROBOT CONTROLLER • MVP 1.0
-      </Text>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-// 5. STYLES
+// 6. STYLES
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#101827',
+    backgroundColor: '#050B14',
   },
-  container: {
-    padding: 20,
-    paddingTop: 55,
-    paddingBottom: 40,
-  },
-  landscapeContainer: {
-    paddingTop: 25,
-    paddingHorizontal: 24,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
-    marginTop: 5,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#3B2028',
-    padding: 9,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
-    marginRight: 6,
-  },
-  statusText: {
-    color: '#FCA5A5',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  connectionCard: {
-    backgroundColor: '#1E293B',
+
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
     padding: 14,
+  },
+
+  controlPanel: {
+    width: '100%',
+    minHeight: 360,
+    borderWidth: 1.5,
+    borderColor: '#1E3A5F',
+    borderRadius: 20,
+    backgroundColor: '#0A1322',
+    overflow: 'hidden',
+    shadowColor: '#06B6D4',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+
+  // TOP BAR
+  topBar: {
+    minHeight: 68,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#1E3A5F',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#0D192B',
+  },
+
+  topButton: {
+    flex: 1,
+    maxWidth: 185,
+    height: 42,
+    backgroundColor: '#065F46', // Xanh lá đậm công nghệ
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    borderRadius: 10,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  topButtonActive: {
+    backgroundColor: '#059669',
+    borderColor: '#6EE7B7',
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+  },
+
+  btButtonDisconnected: {
+    backgroundColor: '#1E293B',
+    borderColor: '#475569',
+    shadowOpacity: 0,
+  },
+
+  btButtonConnected: {
+    backgroundColor: '#0284C7',
+    borderColor: '#38BDF8',
+    shadowColor: '#38BDF8',
+    shadowOpacity: 0.5,
+  },
+
+  topButtonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.97 }],
+  },
+
+  topButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+
+  // MAIN CONTROL
+  mainControl: {
+    flex: 1,
+    minHeight: 290,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    gap: 8,
+  },
+
+  // UP / DOWN
+  verticalControls: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    gap: 14,
+  },
+
+  controlButton: {
+    borderWidth: 1.5,
+    borderColor: '#254E7A',
+    borderRadius: 20,
+    backgroundColor: '#0F2138',
+    padding: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#06B6D4',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+
+  controlButtonPressed: {
+    backgroundColor: '#0369A1',
+    borderColor: '#22D3EE',
+    shadowOpacity: 0.7,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+
+  controlButtonInner: {
+    flex: 1,
+    width: '100%',
     borderRadius: 14,
-    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.15)',
+    backgroundColor: '#132946',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  connectionText: {
-    color: '#FCA5A5',
-    fontSize: 14,
+
+  controlButtonInnerPressed: {
+    backgroundColor: '#0284C7',
+    borderColor: '#7DD3FC',
   },
-  mainLayout: {
+
+  // DIRECTION INDICATOR (RADAR HUD)
+  centerIndicator: {
+    flex: 1.25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  radarContainer: {
     width: '100%',
-  },
-  portraitLayout: {
-    flexDirection: 'column',
-  },
-  landscapeLayout: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 20,
-  },
-  movementSection: {
-    marginBottom: 25,
-  },
-  landscapeMovement: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  rightPanel: {
-    width: '100%',
-  },
-  landscapeRightPanel: {
-    flex: 1,
-  },
-  section: {
-    marginBottom: 22,
-  },
-  sectionTitle: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    marginBottom: 13,
-  },
-  directionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  directionButton: {
-    width: '30%',
-    height: 70,
-    backgroundColor: '#253449',
-    borderRadius: 15,
+
+  radarOuterRing: {
+    width: '92%',
+    aspectRatio: 1,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#1E3A5F',
+    backgroundColor: '#08111E',
+    padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#06B6D4',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
-  directionButtonPressed: {
-    backgroundColor: '#2563EB',
+
+  indicatorGrid: {
+    width: '100%',
+    height: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  directionText: {
-    color: '#FFFFFF',
-    fontSize: 32,
-  },
-  stopButton: {
-    width: '30%',
-    height: 70,
-    backgroundColor: '#7F1D1D',
-    borderRadius: 15,
+
+  indicatorCell: {
+    width: '33.333%',
+    height: '33.333%',
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  arrowWrapper: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  stopText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 17,
+
+  arrowWrapperActive: {
+    backgroundColor: 'rgba(34, 211, 238, 0.18)',
+    borderWidth: 1,
+    borderColor: '#22D3EE',
   },
-  currentDirection: {
-    marginTop: 14,
-    padding: 13,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    alignItems: 'center',
+
+  centerWrapperActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.5)',
   },
-  currentDirectionLabel: {
-    color: '#94A3B8',
+
+  statusBadge: {
+    backgroundColor: '#0F2138',
+    borderWidth: 1,
+    borderColor: '#1E3A5F',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+
+  statusBadgeText: {
+    color: '#38BDF8',
     fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
-  currentDirectionValue: {
-    color: '#60A5FA',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 5,
+
+  // RIGHT PANEL
+  rightControls: {
+    flex: 2,
+    justifyContent: 'space-evenly',
+    gap: 8,
   },
+
+  motorControls: {
+    width: '100%',
+    gap: 8,
+  },
+
   motorCard: {
-    backgroundColor: '#1E293B',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+    width: '100%',
+    backgroundColor: '#0E1C30',
+    borderWidth: 1.5,
+    borderColor: '#1E3A5F',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
+
   motorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
+  motorTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+
   motorName: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
+
+  speedBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+
   speedValue: {
-    color: '#60A5FA',
-    fontWeight: 'bold',
-    fontSize: 16,
+    color: '#22D3EE',
+    fontSize: 14,
+    fontWeight: '900',
   },
+
+  speedUnit: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+
   slider: {
     width: '100%',
-    height: 35,
-    marginTop: 8,
+    height: 24,
   },
+
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+
   sliderLabel: {
-    color: '#94A3B8',
-    fontSize: 10,
-  },
-  functionRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  functionButton: {
-    flex: 1,
-    backgroundColor: '#253449',
-    padding: 14,
-    borderRadius: 13,
-    alignItems: 'center',
-  },
-  functionActive: {
-    backgroundColor: '#166534',
-  },
-  functionText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  functionState: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginTop: 7,
-  },
-  emergencyButton: {
-    backgroundColor: '#DC2626',
-    padding: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  emergencyText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-    letterSpacing: 1,
-  },
-  footer: {
     color: '#64748B',
-    textAlign: 'center',
-    fontSize: 10,
-    marginTop: 5,
+    fontSize: 8,
+    fontWeight: '700',
+  },
+
+  // LEFT / RIGHT
+  horizontalControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    marginTop: 4,
   },
 });

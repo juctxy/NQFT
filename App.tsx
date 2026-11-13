@@ -8,24 +8,16 @@ import {
   Pressable,
   ScrollView,
   useWindowDimensions,
+  PanResponder,
+  Animated,
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
-// 1. Kiểu dữ liệu cho 4 nút điều hướng
+// 1. Kiểu dữ liệu
 type DirectionInput = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+type ControlMode = 'MODE_1' | 'MODE_2';
 
-type Direction =
-  | 'FORWARD'
-  | 'BACKWARD'
-  | 'LEFT'
-  | 'RIGHT'
-  | 'FORWARD_LEFT'
-  | 'FORWARD_RIGHT'
-  | 'BACKWARD_LEFT'
-  | 'BACKWARD_RIGHT'
-  | 'STOP';
-
-// 2. Component nút điều hướng
+// 2. Component nút điều hướng (Dùng cho Mode 1)
 type ControlButtonProps = {
   iconName: keyof typeof Ionicons.glyphMap;
   direction: DirectionInput;
@@ -63,7 +55,6 @@ function ControlButton({
         onPressOut(direction);
       }}
     >
-      {/* Vòng viền phụ bên trong tạo cảm giác nút bấm cơ khí/công nghệ */}
       <View
         style={[
           styles.controlButtonInner,
@@ -73,93 +64,143 @@ function ControlButton({
         <Ionicons
           name={iconName}
           size={Math.floor(size * 0.42)}
-          color={isPressed ? '#FFFFFF' : '#7DD3FC'}
+          color={isPressed ? '#08252B' : '#BCF8F9'}
         />
       </View>
     </View>
   );
 }
 
-// 3. Component hiển thị 8 hướng di chuyển (Dạng Radar HUD)
-type DirectionIndicatorProps = {
-  direction: Direction;
+// 3. Component Joystick (Dùng cho Mode 2 - Đã bỏ hiển thị tọa độ X/Y)
+type VirtualJoystickProps = {
+  size?: number;
+  onMove: (x: number, y: number) => void;
 };
 
-function DirectionIndicator({ direction }: DirectionIndicatorProps) {
-  const arrows: {
-    iconName: keyof typeof Ionicons.glyphMap;
-    direction: Direction;
-  }[] = [
-    { iconName: 'arrow-up-outline', direction: 'FORWARD_LEFT' }, // Sẽ xoay -45 độ
-    { iconName: 'arrow-up-outline', direction: 'FORWARD' },
-    { iconName: 'arrow-up-outline', direction: 'FORWARD_RIGHT' }, // Sẽ xoay 45 độ
-    { iconName: 'arrow-back-outline', direction: 'LEFT' },
-    { iconName: 'radio-button-on', direction: 'STOP' },
-    { iconName: 'arrow-forward-outline', direction: 'RIGHT' },
-    { iconName: 'arrow-down-outline', direction: 'BACKWARD_LEFT' }, // Sẽ xoay 45 độ
-    { iconName: 'arrow-down-outline', direction: 'BACKWARD' },
-    { iconName: 'arrow-down-outline', direction: 'BACKWARD_RIGHT' }, // Sẽ xoay -45 độ
-  ];
+function VirtualJoystick({ size = 190, onMove }: VirtualJoystickProps) {
+  const knobSize = size * 0.36;
+  const maxRadius = (size - knobSize) / 2;
 
-  const getRotation = (dir: Direction) => {
-    switch (dir) {
-      case 'FORWARD_LEFT':
-      case 'BACKWARD_RIGHT':
-        return '-45deg';
-      case 'FORWARD_RIGHT':
-      case 'BACKWARD_LEFT':
-        return '45deg';
-      default:
-        return '0deg';
-    }
-  };
+  const pan = useRef(new Animated.ValueXY()).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        let dx = gestureState.dx;
+        let dy = gestureState.dy;
+
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance > maxRadius) {
+          const angle = Math.atan2(dy, dx);
+          dx = Math.cos(angle) * maxRadius;
+          dy = Math.sin(angle) * maxRadius;
+        }
+
+        pan.setValue({ x: dx, y: dy });
+
+        const normX = Math.round((dx / maxRadius) * 100);
+        const normY = Math.round((-dy / maxRadius) * 100);
+        onMove(normX, normY);
+      },
+      onPanResponderRelease: () => {
+        Animated.spring(pan, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: false,
+          friction: 5,
+        }).start();
+        onMove(0, 0);
+      },
+    }),
+  ).current;
 
   return (
-    <View style={styles.radarContainer}>
-      {/* Vòng tròn định vị bên ngoài */}
-      <View style={styles.radarOuterRing}>
-        <View style={styles.indicatorGrid}>
-          {arrows.map((item, index) => {
-            const isActive = direction === item.direction;
-            const isCenter = item.direction === 'STOP';
+    <View style={styles.joystickWrapper}>
+      <View
+        style={[
+          styles.joystickBase,
+          { width: size, height: size, borderRadius: size / 2 },
+        ]}
+      >
+        <View style={styles.crosshairHorizontal} />
+        <View style={styles.crosshairVertical} />
+        <View style={styles.joystickInnerRing} />
 
-            return (
-              <View key={index} style={styles.indicatorCell}>
-                <View
-                  style={[
-                    styles.arrowWrapper,
-                    isActive && !isCenter && styles.arrowWrapperActive,
-                    isCenter && isActive && styles.centerWrapperActive,
-                    { transform: [{ rotate: getRotation(item.direction) }] },
-                  ]}
-                >
-                  <Ionicons
-                    name={item.iconName}
-                    size={isCenter ? 22 : 24}
-                    color={
-                      isActive
-                        ? isCenter
-                          ? '#F59E0B' // Tâm sáng cam khi STOP
-                          : '#22D3EE' // Hướng sáng Cyan rực rỡ
-                        : '#47698F' // Tăng độ sáng màu nền để không bị chìm
-                    }
-                  />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Nhãn hiển thị trạng thái lệnh Telemetry */}
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusBadgeText}>CMD: {direction}</Text>
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.joystickKnob,
+            {
+              width: knobSize,
+              height: knobSize,
+              borderRadius: knobSize / 2,
+              transform: [{ translateX: pan.x }, { translateY: pan.y }],
+            },
+          ]}
+        >
+          <View style={styles.joystickKnobCore} />
+        </Animated.View>
       </View>
     </View>
   );
 }
 
-// 4. Component điều chỉnh tốc độ motor
+// 4. Component cụm 4 nút Function (Chỉ cho phép chọn 1 Function duy nhất)
+type FunctionButtonsProps = {
+  selectedFunc: string | null;
+  onSelectFunc: (key: string) => void;
+  layout: 'grid' | 'row';
+};
+
+function FunctionButtons({
+  selectedFunc,
+  onSelectFunc,
+  layout,
+}: FunctionButtonsProps) {
+  const buttons = ['F1', 'F2', 'F3', 'F4'];
+
+  return (
+    <View
+      style={
+        layout === 'grid' ? styles.funcGridContainer : styles.funcRowContainer
+      }
+    >
+      {buttons.map((label) => {
+        const isActive = selectedFunc === label;
+        return (
+          <Pressable
+            key={label}
+            onPress={() => onSelectFunc(label)}
+            style={({ pressed }) => [
+              styles.funcButton,
+              layout === 'grid' ? styles.funcButtonGrid : styles.funcButtonRow,
+              isActive && styles.funcButtonActive,
+              pressed && styles.buttonPressedScale,
+            ]}
+          >
+            <View
+              style={[
+                styles.funcLed,
+                isActive ? styles.funcLedOn : styles.funcLedOff,
+              ]}
+            />
+            <Text
+              style={[
+                styles.funcButtonText,
+                isActive && styles.funcButtonTextActive,
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// 5. Component điều chỉnh tốc độ motor (Chỉ giữ lại chỉ số)
 type MotorSliderProps = {
   motorName: string;
   speed: number;
@@ -171,18 +212,15 @@ function MotorSlider({
   speed,
   onSpeedChange,
 }: MotorSliderProps) {
-  const percentage = Math.round((speed / 255) * 100);
-
   return (
     <View style={styles.motorCard}>
       <View style={styles.motorHeader}>
         <View style={styles.motorTitleRow}>
-          <Ionicons name="speedometer-outline" size={14} color="#38BDF8" />
+          <Ionicons name="speedometer-outline" size={14} color="#7AE4E6" />
           <Text style={styles.motorName}>{motorName}</Text>
         </View>
         <View style={styles.speedBadge}>
           <Text style={styles.speedValue}>{speed}</Text>
-          <Text style={styles.speedUnit}>PWM ({percentage}%)</Text>
         </View>
       </View>
 
@@ -193,27 +231,26 @@ function MotorSlider({
         step={1}
         value={speed}
         onValueChange={(value) => onSpeedChange(Math.round(value))}
-        minimumTrackTintColor="#06B6D4"
-        maximumTrackTintColor="#1E3A5F"
-        thumbTintColor="#22D3EE"
+        minimumTrackTintColor="#22D3EE"
+        maximumTrackTintColor="#133842"
+        thumbTintColor="#BCF8F9"
       />
-
-      <View style={styles.sliderLabels}>
-        <Text style={styles.sliderLabel}>MIN: 0</Text>
-        <Text style={styles.sliderLabel}>MAX: 255</Text>
-      </View>
     </View>
   );
 }
 
-// 5. Ứng dụng chính
+// 6. Ứng dụng chính
 export default function App() {
   const { width, height } = useWindowDimensions();
 
   const buttonSize = Math.min(
-    145,
-    Math.max(85, Math.floor(Math.min(width, height) * 0.18)),
+    130,
+    Math.max(82, Math.floor(Math.min(width, height) * 0.18)),
   );
+
+  const [mode, setMode] = useState<ControlMode>('MODE_1');
+  const [btConnected, setBtConnected] = useState(false);
+  const [guideVisible, setGuideVisible] = useState(false);
 
   const [pressedDirections, setPressedDirections] = useState<DirectionInput[]>(
     [],
@@ -221,50 +258,24 @@ export default function App() {
   const [motor1Speed, setMotor1Speed] = useState(128);
   const [motor2Speed, setMotor2Speed] = useState(128);
 
-  // State giả lập cho các nút trên Top Bar
-  const [func1Active, setFunc1Active] = useState(false);
-  const [func2Active, setFunc2Active] = useState(false);
-  const [btConnected, setBtConnected] = useState(false);
+  const [selectedFunc, setSelectedFunc] = useState<string | null>(null);
+
+  const handleSelectFunc = (key: string) => {
+    setSelectedFunc((prev) => (prev === key ? null : key));
+  };
 
   const handlePressIn = (input: DirectionInput) => {
-    setPressedDirections((previous) =>
-      previous.includes(input) ? previous : [...previous, input],
+    setPressedDirections((prev) =>
+      prev.includes(input) ? prev : [...prev, input],
     );
   };
 
   const handlePressOut = (input: DirectionInput) => {
-    setPressedDirections((previous) =>
-      previous.filter((item) => item !== input),
-    );
+    setPressedDirections((prev) => prev.filter((item) => item !== input));
   };
-
-  const getCurrentDirection = (): Direction => {
-    const up = pressedDirections.includes('UP');
-    const down = pressedDirections.includes('DOWN');
-    const left = pressedDirections.includes('LEFT');
-    const right = pressedDirections.includes('RIGHT');
-
-    const vertical = up === down ? null : up ? 'FORWARD' : 'BACKWARD';
-    const horizontal = left === right ? null : left ? 'LEFT' : 'RIGHT';
-
-    if (vertical === 'FORWARD' && horizontal === 'LEFT') return 'FORWARD_LEFT';
-    if (vertical === 'FORWARD' && horizontal === 'RIGHT') return 'FORWARD_RIGHT';
-    if (vertical === 'BACKWARD' && horizontal === 'LEFT') return 'BACKWARD_LEFT';
-    if (vertical === 'BACKWARD' && horizontal === 'RIGHT') return 'BACKWARD_RIGHT';
-
-    if (vertical === 'FORWARD') return 'FORWARD';
-    if (vertical === 'BACKWARD') return 'BACKWARD';
-    if (horizontal === 'LEFT') return 'LEFT';
-    if (horizontal === 'RIGHT') return 'RIGHT';
-
-    return 'STOP';
-  };
-
-  const currentDirection = getCurrentDirection();
 
   return (
     <View style={styles.screen}>
-      {/* Đổi sang light để icon giờ/pin của điện thoại nổi trên nền tối */}
       <StatusBar style="light" />
 
       <ScrollView
@@ -273,138 +284,268 @@ export default function App() {
       >
         {/* KHUNG ĐIỀU KHIỂN CHÍNH */}
         <View style={styles.controlPanel}>
-          {/* THANH TRÊN: 2 FUNCTION + BLUETOOTH */}
+          {/* THANH TOP BAR: TRÁI TÊN NHÓM - PHẢI CÁC NÚT TAB */}
           <View style={styles.topBar}>
-            <Pressable
-              onPress={() => setFunc1Active(!func1Active)}
-              style={({ pressed }) => [
-                styles.topButton,
-                func1Active && styles.topButtonActive,
-                pressed && styles.topButtonPressed,
-              ]}
-            >
-              <Ionicons
-                name={func1Active ? 'flash' : 'flash-outline'}
-                size={16}
-                color="#FFFFFF"
-              />
-              <Text style={styles.topButtonText}>FUNC 1</Text>
-            </Pressable>
+            {/* Bên trái: Watt'up Debuggers */}
+            <View style={styles.brandContainer}>
+              <Ionicons name="hardware-chip" size={20} color="#BCF8F9" />
+              <Text style={styles.brandText}>Watt'up Debuggers</Text>
+            </View>
 
-            <Pressable
-              onPress={() => setFunc2Active(!func2Active)}
-              style={({ pressed }) => [
-                styles.topButton,
-                func2Active && styles.topButtonActive,
-                pressed && styles.topButtonPressed,
-              ]}
-            >
-              <Ionicons
-                name={func2Active ? 'aperture' : 'aperture-outline'}
-                size={16}
-                color="#FFFFFF"
-              />
-              <Text style={styles.topButtonText}>FUNC 2</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setBtConnected(!btConnected)}
-              style={({ pressed }) => [
-                styles.topButton,
-                btConnected ? styles.btButtonConnected : styles.btButtonDisconnected,
-                pressed && styles.topButtonPressed,
-              ]}
-            >
-              <Ionicons
-                name="bluetooth"
-                size={16}
-                color={btConnected ? '#FFFFFF' : '#94A3B8'}
-              />
-              <Text
-                style={[
-                  styles.topButtonText,
-                  !btConnected && { color: '#CBD5E1' },
+            {/* Bên phải: Mode 1, Mode 2, Bluetooth, Hướng dẫn */}
+            <View style={styles.topRightActions}>
+              <Pressable
+                onPress={() => setMode('MODE_1')}
+                style={({ pressed }) => [
+                  styles.topActionButton,
+                  mode === 'MODE_1' && styles.modeButtonActive,
+                  pressed && styles.buttonPressedScale,
                 ]}
               >
-                {btConnected ? 'CONNECTED' : 'BLUETOOTH'}
-              </Text>
-            </Pressable>
+                <Ionicons
+                  name="keypad-outline"
+                  size={14}
+                  color={mode === 'MODE_1' ? '#08252B' : '#88C9CE'}
+                />
+                <Text
+                  style={[
+                    styles.topActionText,
+                    mode === 'MODE_1' && styles.topActionTextActive,
+                  ]}
+                >
+                  MODE 1
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setMode('MODE_2')}
+                style={({ pressed }) => [
+                  styles.topActionButton,
+                  mode === 'MODE_2' && styles.modeButtonActive,
+                  pressed && styles.buttonPressedScale,
+                ]}
+              >
+                <Ionicons
+                  name="game-controller-outline"
+                  size={14}
+                  color={mode === 'MODE_2' ? '#08252B' : '#88C9CE'}
+                />
+                <Text
+                  style={[
+                    styles.topActionText,
+                    mode === 'MODE_2' && styles.topActionTextActive,
+                  ]}
+                >
+                  MODE 2
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setBtConnected(!btConnected)}
+                style={({ pressed }) => [
+                  styles.topActionButton,
+                  btConnected
+                    ? styles.btButtonConnected
+                    : styles.btButtonDisconnected,
+                  pressed && styles.buttonPressedScale,
+                ]}
+              >
+                <Ionicons
+                  name="bluetooth"
+                  size={14}
+                  color={btConnected ? '#08252B' : '#88C9CE'}
+                />
+                <Text
+                  style={[
+                    styles.topActionText,
+                    btConnected && styles.btButtonConnectedText,
+                  ]}
+                >
+                  {btConnected ? 'CONNECTED' : 'BLUETOOTH'}
+                </Text>
+              </Pressable>
+
+              {/* Nút Hướng dẫn (Đã sửa tên & chống crash) */}
+              <Pressable
+                onPress={() => setGuideVisible(true)}
+                style={({ pressed }) => [
+                  styles.topActionButton,
+                  styles.guideButton,
+                  pressed && styles.buttonPressedScale,
+                ]}
+              >
+                <Ionicons name="book-outline" size={14} color="#BCF8F9" />
+                <Text style={styles.topActionTextGuide}>HƯỚNG DẪN</Text>
+              </Pressable>
+            </View>
           </View>
 
-          {/* KHU VỰC ĐIỀU KHIỂN */}
-          <View style={styles.mainControl}>
-            {/* BÊN TRÁI: UP / DOWN */}
-            <View style={styles.verticalControls}>
-              <ControlButton
-                iconName="caret-up"
-                direction="UP"
-                size={buttonSize}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-              />
-
-              <ControlButton
-                iconName="caret-down"
-                direction="DOWN"
-                size={buttonSize}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-              />
-            </View>
-
-            {/* CHÍNH GIỮA: HIỂN THỊ 8 HƯỚNG DẠNG RADAR */}
-            <View style={styles.centerIndicator}>
-              <DirectionIndicator direction={currentDirection} />
-            </View>
-
-            {/* BÊN PHẢI: SLIDER + LEFT / RIGHT */}
-            <View style={styles.rightControls}>
-              {/* MOTOR SPEED */}
-              <View style={styles.motorControls}>
-                <MotorSlider
-                  motorName="MOTOR L (1)"
-                  speed={motor1Speed}
-                  onSpeedChange={setMotor1Speed}
-                />
-
-                <MotorSlider
-                  motorName="MOTOR R (2)"
-                  speed={motor2Speed}
-                  onSpeedChange={setMotor2Speed}
-                />
-              </View>
-
-              {/* LEFT / RIGHT */}
-              <View style={styles.horizontalControls}>
+          {/* KHU VỰC ĐIỀU KHIỂN CHÍNH THEO CHẾ ĐỘ */}
+          {mode === 'MODE_1' ? (
+            /* ================= CHẾ ĐỘ 1 ================= */
+            <View style={styles.mainControl}>
+              {/* BÊN TRÁI: UP / DOWN */}
+              <View style={styles.leftColumnMode1}>
                 <ControlButton
-                  iconName="caret-back"
-                  direction="LEFT"
+                  iconName="caret-up"
+                  direction="UP"
                   size={buttonSize}
                   onPressIn={handlePressIn}
                   onPressOut={handlePressOut}
                 />
-
                 <ControlButton
-                  iconName="caret-forward"
-                  direction="RIGHT"
+                  iconName="caret-down"
+                  direction="DOWN"
                   size={buttonSize}
                   onPressIn={handlePressIn}
                   onPressOut={handlePressOut}
                 />
               </View>
+
+              {/* CHÍNH GIỮA: 4 NÚT FUNCTION (F1 - F4) */}
+              <View style={styles.centerColumnMode1}>
+                <FunctionButtons
+                  selectedFunc={selectedFunc}
+                  onSelectFunc={handleSelectFunc}
+                  layout="grid"
+                />
+              </View>
+
+              {/* BÊN PHẢI: MOTOR SLIDER + LEFT / RIGHT */}
+              <View style={styles.rightColumnMode1}>
+                <View style={styles.motorControls}>
+                  <MotorSlider
+                    motorName="MOTOR 1"
+                    speed={motor1Speed}
+                    onSpeedChange={setMotor1Speed}
+                  />
+                  <MotorSlider
+                    motorName="MOTOR 2"
+                    speed={motor2Speed}
+                    onSpeedChange={setMotor2Speed}
+                  />
+                </View>
+
+                <View style={styles.horizontalControls}>
+                  <ControlButton
+                    iconName="caret-back"
+                    direction="LEFT"
+                    size={buttonSize}
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                  />
+                  <ControlButton
+                    iconName="caret-forward"
+                    direction="RIGHT"
+                    size={buttonSize}
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                  />
+                </View>
+              </View>
             </View>
-          </View>
+          ) : (
+            /* ================= CHẾ ĐỘ 2 ================= */
+            <View style={styles.mainControl}>
+              {/* BÊN TRÁI: JOYSTICK */}
+              <View style={styles.leftColumnMode2}>
+                <VirtualJoystick
+                  size={Math.min(230, Math.floor(height * 0.6))}
+                  onMove={(x, y) => {
+                    // Xử lý tọa độ joystick gửi qua Bluetooth
+                  }}
+                />
+              </View>
+
+              {/* BÊN PHẢI: MOTOR SLIDERS + 4 FUNC BÊN DƯỚI */}
+              <View style={styles.rightColumnMode2}>
+                <View style={styles.motorControls}>
+                  <MotorSlider
+                    motorName="MOTOR 1"
+                    speed={motor1Speed}
+                    onSpeedChange={setMotor1Speed}
+                  />
+                  <MotorSlider
+                    motorName="MOTOR 2"
+                    speed={motor2Speed}
+                    onSpeedChange={setMotor2Speed}
+                  />
+                </View>
+
+                <View style={styles.funcUnderMotorWrapper}>
+                  <FunctionButtons
+                    selectedFunc={selectedFunc}
+                    onSelectFunc={handleSelectFunc}
+                    layout="row"
+                  />
+                </View>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      {/* CỬA SỔ HƯỚNG DẪN DẠNG OVERLAY (KHÔNG DÙNG MODAL ĐỂ TRÁNH VĂNG APP) */}
+      {guideVisible && (
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.overlayCard}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="book" size={18} color="#BCF8F9" />
+              <Text style={styles.modalTitle}>HƯỚNG DẪN SỬ DỤNG - WATT'UP</Text>
+              <Pressable
+                onPress={() => setGuideVisible(false)}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={22} color="#88C9CE" />
+              </Pressable>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalBody}>
+              <View style={styles.guideSection}>
+                <Text style={styles.guideHeading}>1. Chọn phần cứng (Hardware)</Text>
+                <Text style={styles.guideText}>
+                  • Vi điều khiển: ESP32 NodeMCU hoặc Arduino kết hợp module Bluetooth HC-05 / HC-06.{'\n'}
+                  • Mạch điều khiển động cơ: L298N hoặc mạch cầu H tương thích PWM.{'\n'}
+                  • Nguồn điện ổn định cho xe điều khiển cấp THPT (5V - 12V).
+                </Text>
+              </View>
+
+              <View style={styles.guideSection}>
+                <Text style={styles.guideHeading}>2. Kết nối không dây (Connection)</Text>
+                <Text style={styles.guideText}>
+                  • Bật Bluetooth trên điện thoại và nguồn của xe.{'\n'}
+                  • Nhấn nút <Text style={{ color: '#BCF8F9', fontWeight: 'bold' }}>BLUETOOTH</Text> trên app để quét và ghép nối với thiết bị phần cứng của đội.{'\n'}
+                  • Đảm bảo khoảng cách ổn định trong phạm vi 5–6 mét theo yêu cầu cuộc thi.
+                </Text>
+              </View>
+
+              <View style={styles.guideSection}>
+                <Text style={styles.guideHeading}>3. Cấu hình UUID cho ESP32</Text>
+                <Text style={styles.guideText}>
+                  • Định nghĩa Service UUID và Characteristic UUID trong code Arduino/ESP32 trùng khớp với mã UUID cấu hình trên App BLE.{'\n'}
+                  • Gói tin truyền đi theo chuẩn chuỗi ký tự hoặc cấu trúc JSON gọn nhẹ để vi điều khiển dễ dàng xử lý lệnh từ Joystick hoặc F1-F4.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <Pressable
+              style={styles.modalCloseButton}
+              onPress={() => setGuideVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>ĐÃ HIỂU</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
-// 6. STYLES
+// 7. STYLES
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#050B14',
+    backgroundColor: '#041518',
   },
 
   scrollContent: {
@@ -418,82 +559,118 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     borderWidth: 1.5,
-    borderColor: '#1E3A5F',
+    borderColor: '#0D3B44',
     borderRadius: 20,
-    backgroundColor: '#0A1322',
+    backgroundColor: '#071F24',
     overflow: 'hidden',
-    shadowColor: '#06B6D4',
+    shadowColor: '#BCF8F9',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 10,
   },
 
-  // TOP BAR
+  // ================= TOP BAR =================
   topBar: {
     minHeight: 60,
     borderBottomWidth: 1.5,
-    borderBottomColor: '#1E3A5F',
+    borderBottomColor: '#0D3B44',
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: '#0D192B',
   },
 
-  topButton: {
-    flex: 1,
-    maxWidth: 185,
-    height: 42,
-    backgroundColor: '#065F46', // Xanh lá đậm công nghệ
-    borderWidth: 1.5,
-    borderColor: '#10B981',
-    borderRadius: 10,
+  brandContainer: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  brandText: {
+    color: '#BCF8F9',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+
+  topRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  topActionButton: {
+    height: 36,
+    paddingHorizontal: 10,
+    backgroundColor: '#0B333B',
+    borderWidth: 1.5,
+    borderColor: '#114B57',
+    borderRadius: 9,
+    flexDirection: 'row',
+    gap: 5,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#10B981',
-    shadowOpacity: 0.25,
+  },
+
+  modeButtonActive: {
+    backgroundColor: '#BCF8F9',
+    borderColor: '#7AE4E6',
+    shadowColor: '#BCF8F9',
+    shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 4,
   },
 
-  topButtonActive: {
-    backgroundColor: '#059669',
-    borderColor: '#6EE7B7',
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-  },
-
   btButtonDisconnected: {
-    backgroundColor: '#1E293B',
-    borderColor: '#475569',
-    shadowOpacity: 0,
+    backgroundColor: '#0E2A30',
+    borderColor: '#184852',
   },
 
   btButtonConnected: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
+    backgroundColor: '#38BDF8',
+    borderColor: '#7AE4E6',
     shadowColor: '#38BDF8',
     shadowOpacity: 0.5,
   },
 
-  topButtonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.97 }],
+  btButtonConnectedText: {
+    color: '#08252B',
+    fontWeight: '900',
   },
 
-  topButtonText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+  guideButton: {
+    backgroundColor: '#0E3B43',
+    borderColor: '#19616E',
+  },
+
+  topActionText: {
+    color: '#88C9CE',
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 0.5,
   },
 
-  // MAIN CONTROL
+  topActionTextActive: {
+    color: '#08252B',
+    fontWeight: '900',
+  },
+
+  topActionTextGuide: {
+    color: '#BCF8F9',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  buttonPressedScale: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
+  },
+
+  // ================= MAIN CONTROL CHUNG =================
   mainControl: {
     flex: 1,
     minHeight: 0,
@@ -504,139 +681,228 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  // UP / DOWN
-  verticalControls: {
-    flex: 1,
+  // ================= LAYOUT MODE 1 =================
+  leftColumnMode1: {
+    flex: 0.9,
     alignItems: 'center',
-    justifyContent: 'space-evenly',
-    gap: 14,
+    justifyContent: 'center',
+    gap: 16,
   },
 
+  centerColumnMode1: {
+    flex: 1.15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  rightColumnMode1: {
+    flex: 1.75,
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+
+  horizontalControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 22,
+  },
+
+  // ================= LAYOUT MODE 2 =================
+  leftColumnMode2: {
+    flex: 1.1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  rightColumnMode2: {
+    flex: 1.4,
+    justifyContent: 'center',
+    gap: 16,
+    paddingLeft: 10,
+  },
+
+  funcUnderMotorWrapper: {
+    width: '100%',
+    marginTop: 4,
+  },
+
+  // ================= CONTROL BUTTONS (MODE 1) =================
   controlButton: {
     borderWidth: 1.5,
-    borderColor: '#254E7A',
-    borderRadius: 20,
-    backgroundColor: '#0F2138',
+    borderColor: '#124552',
+    borderRadius: 18,
+    backgroundColor: '#092A31',
     padding: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#06B6D4',
+    shadowColor: '#BCF8F9',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
 
   controlButtonPressed: {
-    backgroundColor: '#0369A1',
-    borderColor: '#22D3EE',
-    shadowOpacity: 0.7,
-    shadowRadius: 14,
-    elevation: 10,
+    backgroundColor: '#BCF8F9',
+    borderColor: '#7AE4E6',
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
   },
 
   controlButtonInner: {
     flex: 1,
     width: '100%',
-    borderRadius: 14,
+    borderRadius: 13,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.15)',
-    backgroundColor: '#132946',
+    borderColor: 'rgba(188, 248, 249, 0.2)',
+    backgroundColor: '#0C353E',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   controlButtonInnerPressed: {
-    backgroundColor: '#0284C7',
-    borderColor: '#7DD3FC',
+    backgroundColor: '#BCF8F9',
+    borderColor: '#FFFFFF',
   },
 
-  // DIRECTION INDICATOR (RADAR HUD)
-  centerIndicator: {
-    flex: 1.25,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  radarContainer: {
+  // ================= FUNCTION BUTTONS (F1 - F4) =================
+  funcGridContainer: {
     width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-
-  radarOuterRing: {
-    width: '92%',
-    aspectRatio: 1,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#1E3A5F',
-    backgroundColor: '#08111E',
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#06B6D4',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-  },
-
-  indicatorGrid: {
-    width: '100%',
-    height: '100%',
+    maxWidth: 210,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
   },
 
-  indicatorCell: {
-    width: '33.333%',
-    height: '33.333%',
+  funcRowContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+
+  funcButton: {
+    backgroundColor: '#092A31',
+    borderWidth: 1.5,
+    borderColor: '#124552',
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
 
-  arrowWrapper: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+  funcButtonGrid: {
+    width: '45%',
+    aspectRatio: 1.25,
   },
 
-  arrowWrapperActive: {
-    backgroundColor: 'rgba(34, 211, 238, 0.18)',
-    borderWidth: 1,
-    borderColor: '#22D3EE',
+  funcButtonRow: {
+    flex: 1,
+    height: 52,
   },
 
-  centerWrapperActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.5)',
+  funcButtonActive: {
+    backgroundColor: '#0E5C6B',
+    borderColor: '#BCF8F9',
+    shadowColor: '#BCF8F9',
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 5,
   },
 
-  statusBadge: {
-    backgroundColor: '#0F2138',
-    borderWidth: 1,
-    borderColor: '#1E3A5F',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 6,
+  funcLed: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
 
-  statusBadgeText: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontWeight: '800',
+  funcLedOff: {
+    backgroundColor: '#1E4E59',
+  },
+
+  funcLedOn: {
+    backgroundColor: '#BCF8F9',
+    shadowColor: '#BCF8F9',
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+  },
+
+  funcButtonText: {
+    color: '#88C9CE',
+    fontSize: 12,
+    fontWeight: '900',
     letterSpacing: 1,
   },
 
-  // RIGHT PANEL
-  rightControls: {
-    flex: 2,
-    justifyContent: 'space-evenly',
-    gap: 8,
+  funcButtonTextActive: {
+    color: '#FFFFFF',
   },
 
+  // ================= JOYSTICK (MODE 2) =================
+  joystickWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  joystickBase: {
+    backgroundColor: '#051B20',
+    borderWidth: 2,
+    borderColor: '#124552',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#BCF8F9',
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+
+  joystickInnerRing: {
+    position: 'absolute',
+    width: '55%',
+    height: '55%',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(188, 248, 249, 0.2)',
+    borderStyle: 'dashed',
+  },
+
+  crosshairHorizontal: {
+    position: 'absolute',
+    width: '85%',
+    height: 1,
+    backgroundColor: 'rgba(188, 248, 249, 0.15)',
+  },
+
+  crosshairVertical: {
+    position: 'absolute',
+    width: 1,
+    height: '85%',
+    backgroundColor: 'rgba(188, 248, 249, 0.15)',
+  },
+
+  joystickKnob: {
+    backgroundColor: '#0E5C6B',
+    borderWidth: 2,
+    borderColor: '#BCF8F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#BCF8F9',
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+
+  joystickKnobCore: {
+    width: '40%',
+    height: '40%',
+    borderRadius: 999,
+    backgroundColor: '#BCF8F9',
+  },
+
+  // ================= MOTOR SLIDERS =================
   motorControls: {
     width: '100%',
     gap: 8,
@@ -644,9 +910,9 @@ const styles = StyleSheet.create({
 
   motorCard: {
     width: '100%',
-    backgroundColor: '#0E1C30',
+    backgroundColor: '#082329',
     borderWidth: 1.5,
-    borderColor: '#1E3A5F',
+    borderColor: '#124552',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -665,7 +931,7 @@ const styles = StyleSheet.create({
   },
 
   motorName: {
-    color: '#CBD5E1',
+    color: '#88C9CE',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
@@ -674,43 +940,101 @@ const styles = StyleSheet.create({
   speedBadge: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 4,
   },
 
   speedValue: {
-    color: '#22D3EE',
+    color: '#BCF8F9',
     fontSize: 14,
     fontWeight: '900',
   },
 
-  speedUnit: {
-    color: '#64748B',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-
   slider: {
     width: '100%',
-    height: 24,
+    height: 26,
   },
 
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  sliderLabel: {
-    color: '#64748B',
-    fontSize: 8,
-    fontWeight: '700',
-  },
-
-  // LEFT / RIGHT
-  horizontalControls: {
-    flexDirection: 'row',
+  // ================= OVERLAY GUIDE STYLES =================
+  overlayBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(4, 21, 24, 0.88)',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 24,
-    marginTop: 4,
+    padding: 16,
+    zIndex: 999,
+  },
+
+  overlayCard: {
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '85%',
+    backgroundColor: '#071F24',
+    borderWidth: 1.5,
+    borderColor: '#124552',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#BCF8F9',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#09272D',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#124552',
+  },
+
+  modalTitle: {
+    color: '#BCF8F9',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  modalBody: {
+    padding: 16,
+    gap: 16,
+  },
+
+  guideSection: {
+    gap: 6,
+  },
+
+  guideHeading: {
+    color: '#BCF8F9',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  guideText: {
+    color: '#88C9CE',
+    fontSize: 11,
+    lineHeight: 18,
+  },
+
+  modalCloseButton: {
+    backgroundColor: '#0E5C6B',
+    borderTopWidth: 1.5,
+    borderTopColor: '#124552',
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  modalCloseButtonText: {
+    color: '#BCF8F9',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
 });

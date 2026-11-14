@@ -19,7 +19,7 @@ git --version
 ```
 
 ---
-git add mobile/
+
 ## 2. Clone Repository
 
 Mở Terminal tại thư mục muốn lưu dự án và chạy:

@@ -53,7 +53,7 @@ Lệnh này cài các phiên bản thư viện đã khóa trong `package-lock.js
 Chạy Expo ở chế độ Expo Go qua tunnel:
 
 ```bash
-npx expo start --go --tunnel
+npx expo start --go 
 ```
 
 Mở ứng dụng trên điện thoại:
@@ -62,8 +62,6 @@ Mở ứng dụng trên điện thoại:
 2. Mở **Expo Go** trên điện thoại.
 3. Dùng trình quét QR bên trong Expo Go để quét mã.
 4. Chờ ứng dụng tải về điện thoại.
-
-> Chế độ `--tunnel` cần kết nối Internet. Nếu điện thoại và máy tính cùng mạng Wi-Fi, có thể thử `npx expo start --go` thay thế.
 
 ---
 

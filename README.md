@@ -30,7 +30,6 @@ git clone -b layout3_mobile --single-branch https://github.com/juctxy/NQFT.git
 
 # Di chuyển vào thư mục ứng dụng mobile
 cd NQFT
-cd mobile
 ```
 
 > **Lưu ý:** Repository có cả ứng dụng web ở thư mục gốc và ứng dụng Expo trong `mobile/`. Để chạy Expo, chỉ cần cài thư viện và chạy lệnh trong `mobile/`; không cần cài dependencies của ứng dụng web.
@@ -80,27 +79,10 @@ Mở ứng dụng trên điện thoại:
 
 ---
 
-## 6. Kiểm tra ứng dụng
-
-Chạy các kiểm tra logic của controller:
-
-```bash
-npm test
-```
-
-Kiểm tra TypeScript:
-
-```bash
-npx tsc --noEmit
-```
-
----
-
-## 7. Cấu trúc ứng dụng mobile
+## 6. Cấu trúc ứng dụng mobile
 
 ```text
 NQFT/
-└── mobile/
     ├── app/                  # Các route Expo Router
     ├── assets/               # Logo, icon và hình ảnh
     ├── components/           # Controller, hướng dẫn và cài đặt

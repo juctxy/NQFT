@@ -25,8 +25,8 @@ import {
 } from 'react-native';
 import { clampJoystick, determineDirection, type CommandType } from '../controller';
 
-const CANVAS_WIDTH = 840;
-const CANVAS_HEIGHT = 430;
+const CANVAS_WIDTH = 780;
+const CANVAS_HEIGHT = 360;
 const JOYSTICK_SIZE = 190;
 const JOYSTICK_RADIUS = 60;
 

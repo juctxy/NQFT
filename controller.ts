@@ -9,9 +9,27 @@ export type CommandType =
   | 'BACKWARD_LEFT'
   | 'BACKWARD_RIGHT';
 
+export interface SpeedPresets {
+  slow: number;
+  medium: number;
+  fast: number;
+}
+
 export interface JoystickPosition {
   x: number;
   y: number;
+}
+
+export function getMatchingSpeedPreset(
+  motor1Speed: number,
+  motor2Speed: number,
+  presets: SpeedPresets,
+): keyof SpeedPresets | null {
+  if (motor1Speed !== motor2Speed) return null;
+
+  const presetKeys: Array<keyof SpeedPresets> = ['slow', 'medium', 'fast'];
+  const matches = presetKeys.filter((key) => presets[key] === motor1Speed);
+  return matches.length === 1 ? matches[0] ?? null : null;
 }
 
 export function clampJoystick(

@@ -1,12 +1,7 @@
 import { ArrowLeftCircle, RotateCcw, Settings } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-
-export interface SpeedPresets {
-  slow: number;
-  medium: number;
-  fast: number;
-}
+import type { SpeedPresets } from '../controller';
 
 interface SettingsScreenProps {
   presets: SpeedPresets;

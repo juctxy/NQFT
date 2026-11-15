@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clampJoystick, clampSpeed, determineDirection } from './controller.ts';
+import {
+  clampJoystick,
+  clampSpeed,
+  determineDirection,
+  getMatchingSpeedPreset,
+} from './controller.ts';
 
 test('returns STOP for joystick movement inside the dead zone', () => {
   assert.equal(determineDirection(10, 10), 'STOP');
@@ -33,4 +38,61 @@ test('limits joystick movement to its circular travel boundary', () => {
 
   const diagonal = clampJoystick(100, 100, 50);
   assert.ok(Math.hypot(diagonal.x, diagonal.y) <= 50);
+});
+
+test('matches the unique preset shared by both motor speeds', () => {
+  assert.equal(
+    getMatchingSpeedPreset(190, 190, {
+      slow: 130,
+      medium: 190,
+      fast: 255,
+    }),
+    'medium',
+  );
+});
+
+test('returns no preset when motor speeds are unequal', () => {
+  assert.equal(
+    getMatchingSpeedPreset(190, 130, {
+      slow: 130,
+      medium: 190,
+      fast: 255,
+    }),
+    null,
+  );
+});
+
+test('returns no preset when neither motor speed matches a configured value', () => {
+  assert.equal(
+    getMatchingSpeedPreset(140, 140, {
+      slow: 130,
+      medium: 190,
+      fast: 255,
+    }),
+    null,
+  );
+});
+
+test('returns no preset when multiple presets share the motor speed', () => {
+  assert.equal(
+    getMatchingSpeedPreset(190, 190, {
+      slow: 190,
+      medium: 190,
+      fast: 255,
+    }),
+    null,
+  );
+});
+
+test('matches against the current preset values', () => {
+  const updatedPresets = { slow: 130, medium: 205, fast: 255 };
+
+  assert.equal(
+    getMatchingSpeedPreset(205, 205, updatedPresets),
+    'medium',
+  );
+  assert.equal(
+    getMatchingSpeedPreset(190, 190, updatedPresets),
+    null,
+  );
 });

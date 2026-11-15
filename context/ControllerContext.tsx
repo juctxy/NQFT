@@ -6,8 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { clampSpeed } from '../controller';
-import type { SpeedPresets } from '../components/SettingsScreen';
+import { clampSpeed, type SpeedPresets } from '../controller';
 
 export const DEFAULT_PRESETS: SpeedPresets = {
   slow: 130,

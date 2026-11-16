@@ -1,0 +1,76 @@
+/* Style tối thiểu cho trang kiểm tra — chưa phải thiết kế UI */
+:root {
+  color-scheme: dark;
+  --bg: #111318;
+  --card: #1b1e25;
+  --text: #f5f7fa;
+  --muted: #9aa3b2;
+  --accent: #4fc3f7;
+  --ok: #66bb6a;
+  --warn: #ffb74d;
+  --err: #ef5350;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px 32px;
+}
+
+h1 { font-size: 1.25rem; }
+h2 { font-size: 1rem; margin: 0 0 12px; }
+
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.row { display: flex; gap: 8px; margin-top: 12px; }
+
+button {
+  flex: 1;
+  padding: 12px;
+  font-size: 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+button:disabled { opacity: 0.4; }
+
+.state { font-weight: 700; margin-bottom: 4px; }
+.state-connected { color: var(--ok); }
+.state-connecting, .state-reconnecting { color: var(--warn); }
+.state-disconnected { color: var(--muted); }
+
+.error { color: var(--err); margin-top: 4px; word-break: break-word; }
+.muted { color: var(--muted); font-size: 0.875rem; margin-top: 8px; }
+
+.notice {
+  background: #3a2a12;
+  border-left: 4px solid var(--warn);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.notice p { margin: 6px 0 0; }
+
+.slider { display: block; margin-bottom: 16px; }
+.slider input { width: 100%; touch-action: none; }
+
+ul { margin: 0; padding-left: 18px; line-height: 1.7; }

@@ -42,33 +42,56 @@ function isStandalone(): boolean {
   );
 }
 
+// Bắt sự kiện ngay khi module được nạp — beforeinstallprompt có thể đến trước khi React render.
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
+let justInstalled = false;
+const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((cb) => cb());
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // tự hiện nút của app thay vì banner mặc định
+    deferredPrompt = e as BeforeInstallPromptEvent;
+    notify();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    justInstalled = true;
+    notify();
+  });
+}
+
 export function useInstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(isStandalone);
+  const [, force] = useState(0);
+  const [standalone] = useState(isStandalone);
 
   useEffect(() => {
-    const onPrompt = (e: Event) => {
-      e.preventDefault(); // tự hiện nút của app thay vì banner mặc định
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferred(null);
-    };
-    window.addEventListener('beforeinstallprompt', onPrompt);
-    window.addEventListener('appinstalled', onInstalled);
+    const cb = () => force((n) => n + 1);
+    listeners.add(cb);
     return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt);
-      window.removeEventListener('appinstalled', onInstalled);
+      listeners.delete(cb);
     };
   }, []);
 
-  const install = async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setDeferred(null); // mỗi sự kiện chỉ dùng được 1 lần
+  /** true nếu Chrome cho phép hiện hộp thoại cài trực tiếp; false -> phải hướng dẫn cài bằng menu. */
+  const canPrompt = !!deferredPrompt;
+
+  const install = async (): Promise<boolean> => {
+    const ev = deferredPrompt;
+    if (!ev) return false;
+    deferredPrompt = null; // mỗi sự kiện chỉ dùng được 1 lần
+    notify();
+    await ev.prompt();
+    const { outcome } = await ev.userChoice;
+    return outcome === 'accepted';
   };
 
-  return { canInstall: !!deferred && !installed, installed, install };
+  return {
+    /** Đang chạy trong app đã cài (không phải tab trình duyệt). */
+    standalone,
+    /** Vừa cài xong trong phiên này. */
+    justInstalled,
+    canPrompt,
+    install,
+  };
 }

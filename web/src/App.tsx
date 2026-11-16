@@ -71,13 +71,68 @@ function BraveNotice() {
   );
 }
 
+function InstallHelp() {
+  const platform = detectPlatform();
+  if (platform === 'ios') {
+    return (
+      <ol>
+        <li>Mở trang này trong <b>Bluefy</b>.</li>
+        <li>Lưu trang vào bookmark của Bluefy để mở nhanh lần sau.</li>
+      </ol>
+    );
+  }
+  if (platform === 'android') {
+    return (
+      <>
+        <ol>
+          <li>Bấm menu <b>⋮</b> (góc trên bên phải Chrome).</li>
+          <li>Chọn <b>Cài đặt ứng dụng</b> hoặc <b>Thêm vào màn hình chính</b> → <b>Cài đặt</b>.</li>
+          <li>
+            Nếu menu chỉ có <b>Mở ứng dụng</b>: app vẫn đang được cài — tìm icon <b>RC Car</b> trên màn hình chính.
+            Nếu bạn vừa gỡ app, đóng hẳn Chrome, mở lại trang này rồi thử lại.
+          </li>
+        </ol>
+        <p className="muted">
+          Hoặc cài bằng file APK: <a href={APK_URL} target="_blank" rel="noreferrer">tải APK</a>.
+        </p>
+      </>
+    );
+  }
+  return (
+    <ol>
+      <li>Bấm biểu tượng <b>Cài đặt</b> (màn hình có mũi tên) ở cuối thanh địa chỉ Chrome/Edge,</li>
+      <li>hoặc menu <b>⋮ → Truyền, lưu và chia sẻ → Cài đặt trang dưới dạng ứng dụng</b>.</li>
+    </ol>
+  );
+}
+
 function InstallBanner() {
-  const { canInstall, install } = useInstallPrompt();
-  if (!canInstall) return null;
+  const { standalone, justInstalled, canPrompt, install } = useInstallPrompt();
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Đang chạy trong app đã cài -> không cần nút cài.
+  if (standalone) return null;
+
+  const onClick = async () => {
+    if (canPrompt) {
+      const accepted = await install();
+      if (!accepted) setShowHelp(true);
+    } else {
+      setShowHelp((v) => !v);
+    }
+  };
+
   return (
     <div className="install">
-      <span>Cài <b>RC Car</b> lên màn hình chính để mở nhanh, chạy cả khi không có mạng.</span>
-      <button onClick={install}>📲 Cài app</button>
+      <div className="install-row">
+        <span>
+          {justInstalled
+            ? <>Đã cài <b>RC Car</b> — mở app từ màn hình chính.</>
+            : <>Cài <b>RC Car</b> lên màn hình chính để mở nhanh, chạy cả khi không có mạng.</>}
+        </span>
+        <button onClick={onClick}>{canPrompt ? '📲 Cài app' : showHelp ? 'Ẩn hướng dẫn' : '📲 Cách cài app'}</button>
+      </div>
+      {showHelp && <InstallHelp />}
     </div>
   );
 }

@@ -15,9 +15,26 @@ export interface SpeedPresets {
   fast: number;
 }
 
+const SPEED_PRESET_LABELS: Record<keyof SpeedPresets, string> = {
+  slow: 'Chậm',
+  medium: 'Vừa',
+  fast: 'Nhanh',
+};
+
 export interface JoystickPosition {
   x: number;
   y: number;
+}
+
+export function getSpeedPresetLabel(preset: keyof SpeedPresets | null): string {
+  return preset === null ? 'Tùy chỉnh' : SPEED_PRESET_LABELS[preset];
+}
+
+export function getChangedCommand(
+  previous: CommandType,
+  next: CommandType,
+): CommandType | null {
+  return previous === next ? null : next;
 }
 
 export function getMatchingSpeedPreset(

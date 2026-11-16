@@ -5,18 +5,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ControllerScreen } from './components/ControllerScreen';
 import { useController } from './context/ControllerContext';
 import type { CommandType } from './controller';
+import { useBluetoothConnection } from './hooks/useBluetoothConnection';
 
 export default function App() {
   const router = useRouter();
   const {
     motor1Speed,
     motor2Speed,
+    presets,
     setMotor1Speed,
     setMotor2Speed,
+    applyPreset,
   } = useController();
+  const bluetooth = useBluetoothConnection();
   const [command, setCommand] = useState<CommandType>('STOP');
   const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [bluetoothConnected, setBluetoothConnected] = useState(false);
   const actionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -44,13 +47,22 @@ export default function App() {
       <ControllerScreen
         motor1Speed={motor1Speed}
         motor2Speed={motor2Speed}
+        presets={presets}
         command={activeAction ?? command}
-        bluetoothConnected={bluetoothConnected}
+        bluetoothDevices={bluetooth.devices}
+        connectedDevice={bluetooth.connectedDevice}
+        bluetoothIsScanning={bluetooth.isScanning}
+        bluetoothIsConnecting={bluetooth.isConnecting}
+        bluetoothError={bluetooth.error}
         onMotor1SpeedChange={setMotor1Speed}
         onMotor2SpeedChange={setMotor2Speed}
+        onApplyPreset={applyPreset}
         onCommandChange={handleCommandChange}
         onAction={handleAction}
-        onBluetoothToggle={() => setBluetoothConnected((connected) => !connected)}
+        onBluetoothScan={bluetooth.scan}
+        onBluetoothStopScan={bluetooth.stopScan}
+        onBluetoothConnect={bluetooth.connect}
+        onBluetoothDisconnect={bluetooth.disconnect}
         onOpenInstructions={() => router.push('/instructions')}
         onOpenSettings={() => router.push('/settings')}
       />

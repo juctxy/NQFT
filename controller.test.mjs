@@ -6,6 +6,7 @@ import {
   determineDirection,
   getMatchingSpeedPreset,
 } from './controller.ts';
+import * as controller from './controller.ts';
 
 test('returns STOP for joystick movement inside the dead zone', () => {
   assert.equal(determineDirection(10, 10), 'STOP');
@@ -20,6 +21,19 @@ test('maps each joystick octant to its controller command', () => {
   assert.equal(determineDirection(-40, -40), 'FORWARD_LEFT');
   assert.equal(determineDirection(0, -40), 'FORWARD');
   assert.equal(determineDirection(40, -40), 'FORWARD_RIGHT');
+});
+
+test('does not republish a joystick command when its direction is unchanged', () => {
+  assert.equal(controller.getChangedCommand('FORWARD', 'FORWARD'), null);
+});
+
+test('publishes joystick direction changes and the first STOP command', () => {
+  assert.equal(controller.getChangedCommand('FORWARD', 'RIGHT'), 'RIGHT');
+  assert.equal(controller.getChangedCommand('FORWARD', 'STOP'), 'STOP');
+});
+
+test('does not republish STOP when the joystick is already stopped', () => {
+  assert.equal(controller.getChangedCommand('STOP', 'STOP'), null);
 });
 
 test('clamps motor speed values to the PWM range', () => {
@@ -94,5 +108,18 @@ test('matches against the current preset values', () => {
   assert.equal(
     getMatchingSpeedPreset(190, 190, updatedPresets),
     null,
+  );
+});
+
+test('uses Vietnamese labels for preset and custom speeds', () => {
+  assert.equal(typeof controller.getSpeedPresetLabel, 'function');
+  assert.deepEqual(
+    [
+      controller.getSpeedPresetLabel('slow'),
+      controller.getSpeedPresetLabel('medium'),
+      controller.getSpeedPresetLabel('fast'),
+      controller.getSpeedPresetLabel(null),
+    ],
+    ['Chậm', 'Vừa', 'Nhanh', 'Tùy chỉnh'],
   );
 });

@@ -1,6 +1,13 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import Slider from '@react-native-community/slider';
 import {
+  GestureDetector,
+  usePanGesture,
+  useTapGesture,
+  type PanGestureConfig,
+  type PanGesture,
+} from 'react-native-gesture-handler';
+import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -14,7 +21,7 @@ import {
   X,
 } from 'lucide-react-native';
 import {
-  PanResponder,
+  Animated,
   Image,
   Pressable,
   StyleSheet,
@@ -23,7 +30,16 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
-import { clampJoystick, determineDirection, type CommandType } from '../controller';
+import { BluetoothPicker } from './BluetoothPicker';
+import { nearbyDeviceName, type NearbyDevice } from '../bluetooth';
+import {
+  clampJoystick,
+  determineDirection,
+  getChangedCommand,
+  type CommandType,
+  type SpeedPresets,
+} from '../controller';
+import { SpeedPresetSelector } from './SpeedPresetSelector';
 
 const CANVAS_WIDTH = 780;
 const CANVAS_HEIGHT = 360;
@@ -33,96 +49,98 @@ const JOYSTICK_RADIUS = 60;
 interface ControllerScreenProps {
   motor1Speed: number;
   motor2Speed: number;
+  presets: SpeedPresets;
   command: string;
-  bluetoothConnected: boolean;
+  bluetoothDevices: NearbyDevice[];
+  connectedDevice: NearbyDevice | null;
+  bluetoothIsScanning: boolean;
+  bluetoothIsConnecting: boolean;
+  bluetoothError: string | null;
   onMotor1SpeedChange: (value: number) => void;
   onMotor2SpeedChange: (value: number) => void;
+  onApplyPreset: (value: number) => void;
   onCommandChange: (command: CommandType) => void;
   onAction: (action: string) => void;
-  onBluetoothToggle: () => void;
+  onBluetoothScan: () => Promise<void>;
+  onBluetoothStopScan: () => Promise<void>;
+  onBluetoothConnect: (device: NearbyDevice) => Promise<void>;
+  onBluetoothDisconnect: () => Promise<void>;
   onOpenInstructions: () => void;
   onOpenSettings: () => void;
 }
 
 function Joystick({
   command,
-  onCommandChange,
+  position,
+  gesture,
 }: {
   command: string;
-  onCommandChange: (command: CommandType) => void;
+  position: Animated.ValueXY;
+  gesture: PanGesture;
 }) {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-
-  const updatePosition = useCallback(
-    (x: number, y: number) => {
-      const next = clampJoystick(
-        x - JOYSTICK_SIZE / 2,
-        y - JOYSTICK_SIZE / 2,
-        JOYSTICK_RADIUS,
-      );
-      setPosition(next);
-      onCommandChange(determineDirection(next.x, next.y));
-    },
-    [onCommandChange],
-  );
-
-  const stop = useCallback(() => {
-    setPosition({ x: 0, y: 0 });
-    onCommandChange('STOP');
-  }, [onCommandChange]);
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (event) => {
-          updatePosition(event.nativeEvent.locationX, event.nativeEvent.locationY);
-        },
-        onPanResponderMove: (event) => {
-          updatePosition(event.nativeEvent.locationX, event.nativeEvent.locationY);
-        },
-        onPanResponderRelease: stop,
-        onPanResponderTerminate: stop,
-        onPanResponderTerminationRequest: () => false,
-      }),
-    [stop, updatePosition],
-  );
-
   return (
-    <View
-      accessibilityLabel="Eight-direction joystick"
-      accessibilityHint={`Current command: ${command}`}
-      accessibilityRole="adjustable"
-      style={styles.joystick}
-      {...panResponder.panHandlers}
-    >
-      <ArrowUp color="rgba(244,117,24,0.6)" size={14} style={styles.arrowUp} />
-      <ArrowDown color="rgba(244,117,24,0.6)" size={14} style={styles.arrowDown} />
-      <ArrowLeft color="rgba(244,117,24,0.6)" size={14} style={styles.arrowLeft} />
-      <ArrowRight color="rgba(244,117,24,0.6)" size={14} style={styles.arrowRight} />
+    <GestureDetector gesture={gesture}>
       <View
-        pointerEvents="none"
-        style={[
-          styles.joystickKnob,
-          { transform: [{ translateX: position.x }, { translateY: position.y }] },
-        ]}
+        accessibilityLabel="Eight-direction joystick"
+        accessibilityHint={`Current command: ${command}`}
+        accessibilityRole="adjustable"
+        style={styles.joystick}
       >
-        <View style={styles.joystickKnobInner} />
+        <ArrowUp color="rgba(244,117,24,0.6)" size={14} style={styles.arrowUp} />
+        <ArrowDown color="rgba(244,117,24,0.6)" size={14} style={styles.arrowDown} />
+        <ArrowLeft color="rgba(244,117,24,0.6)" size={14} style={styles.arrowLeft} />
+        <ArrowRight color="rgba(244,117,24,0.6)" size={14} style={styles.arrowRight} />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.joystickKnob,
+            { transform: position.getTranslateTransform() },
+          ]}
+        >
+          <View style={styles.joystickKnobInner} />
+        </Animated.View>
       </View>
-    </View>
+    </GestureDetector>
   );
 }
 
-function FunctionButton({ label, onPress }: { label: string; onPress: () => void }) {
+function FunctionButton({
+  label,
+  joystickGesture,
+  onPress,
+}: {
+  label: string;
+  joystickGesture: PanGesture;
+  onPress: () => void;
+}) {
+  const [isPressed, setIsPressed] = useState(false);
+  const onPressRef = useRef(onPress);
+  onPressRef.current = onPress;
+  const tapGesture = useTapGesture(
+    useMemo(
+      () => ({
+        runOnJS: true,
+        simultaneousWith: joystickGesture,
+        onBegin: () => setIsPressed(true),
+        onActivate: () => onPressRef.current(),
+        onFinalize: () => setIsPressed(false),
+      }),
+      [joystickGesture],
+    ),
+  );
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.functionButton, pressed && styles.pressedButton]}
-    >
-      <Text style={styles.functionText}>{label}</Text>
-    </Pressable>
+    <GestureDetector gesture={tapGesture}>
+      <View
+        accessible
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        onAccessibilityTap={onPress}
+        style={[styles.functionButton, isPressed && styles.pressedButton]}
+      >
+        <Text style={styles.functionText}>{label}</Text>
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -131,49 +149,133 @@ function ActionButton({
   accessibilityLabel,
   icon,
   style,
+  joystickGesture,
   onPress,
 }: {
   label: string;
   accessibilityLabel: string;
   icon: ReactNode;
   style: object;
+  joystickGesture: PanGesture;
   onPress: () => void;
 }) {
+  const [isPressed, setIsPressed] = useState(false);
+  const onPressRef = useRef(onPress);
+  onPressRef.current = onPress;
+  const tapGesture = useTapGesture(
+    useMemo(
+      () => ({
+        runOnJS: true,
+        simultaneousWith: joystickGesture,
+        onBegin: () => setIsPressed(true),
+        onActivate: () => onPressRef.current(),
+        onFinalize: () => setIsPressed(false),
+      }),
+      [joystickGesture],
+    ),
+  );
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.actionButton,
-        style,
-        pressed && styles.pressedButton,
-      ]}
-    >
-      {icon}
-      <Text style={styles.actionLabel}>{label}</Text>
-    </Pressable>
+    <GestureDetector gesture={tapGesture}>
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        onAccessibilityTap={onPress}
+        style={[
+          styles.actionButton,
+          style,
+          isPressed && styles.pressedButton,
+        ]}
+      >
+        {icon}
+        <Text style={styles.actionLabel}>{label}</Text>
+      </View>
+    </GestureDetector>
   );
 }
 
 export function ControllerScreen({
   motor1Speed,
   motor2Speed,
+  presets,
   command,
-  bluetoothConnected,
+  bluetoothDevices,
+  connectedDevice,
+  bluetoothIsScanning,
+  bluetoothIsConnecting,
+  bluetoothError,
   onMotor1SpeedChange,
   onMotor2SpeedChange,
+  onApplyPreset,
   onCommandChange,
   onAction,
-  onBluetoothToggle,
+  onBluetoothScan,
+  onBluetoothStopScan,
+  onBluetoothConnect,
+  onBluetoothDisconnect,
   onOpenInstructions,
   onOpenSettings,
 }: ControllerScreenProps) {
+  const [joystickPosition] = useState(
+    () => new Animated.ValueXY({ x: 0, y: 0 }),
+  );
+  const joystickOrigin = useRef({ x: 0, y: 0 });
+  const lastPublishedCommand = useRef<CommandType>('STOP');
+  const publishCommand = useCallback(
+    (nextCommand: CommandType) => {
+      const changedCommand = getChangedCommand(
+        lastPublishedCommand.current,
+        nextCommand,
+      );
+      if (changedCommand === null) return;
+
+      lastPublishedCommand.current = changedCommand;
+      onCommandChange(changedCommand);
+    },
+    [onCommandChange],
+  );
+  const updateJoystickPosition = useCallback(
+    (x: number, y: number) => {
+      const next = clampJoystick(
+        x - JOYSTICK_SIZE / 2,
+        y - JOYSTICK_SIZE / 2,
+        JOYSTICK_RADIUS,
+      );
+      joystickPosition.setValue(next);
+      publishCommand(determineDirection(next.x, next.y));
+    },
+    [joystickPosition, publishCommand],
+  );
+  const resetJoystick = useCallback(() => {
+    joystickPosition.setValue({ x: 0, y: 0 });
+    publishCommand('STOP');
+  }, [joystickPosition, publishCommand]);
+  const joystickGestureConfig = useMemo<PanGestureConfig>(
+    () => ({
+      runOnJS: true,
+      cancelsJSResponder: false,
+      onBegin: ({ x, y }) => {
+        joystickOrigin.current = { x, y };
+        updateJoystickPosition(x, y);
+      },
+      onUpdate: ({ translationX, translationY }) => {
+        updateJoystickPosition(
+          joystickOrigin.current.x + translationX,
+          joystickOrigin.current.y + translationY,
+        );
+      },
+      onFinalize: resetJoystick,
+    }),
+    [resetJoystick, updateJoystickPosition],
+  );
+  const joystickGesture = usePanGesture(joystickGestureConfig);
   const windowSize = useWindowDimensions();
   const [availableSize, setAvailableSize] = useState({
     width: windowSize.width,
     height: windowSize.height,
   });
+  const [bluetoothPickerVisible, setBluetoothPickerVisible] = useState(false);
   const scale = Math.min(
     availableSize.width / CANVAS_WIDTH,
     availableSize.height / CANVAS_HEIGHT,
@@ -183,9 +285,22 @@ export function ControllerScreen({
     const { width, height } = event.nativeEvent.layout;
     setAvailableSize({ width, height });
   }, []);
+  const handleBluetoothPress = useCallback(() => {
+    setBluetoothPickerVisible(true);
+    if (!connectedDevice && !bluetoothIsConnecting) {
+      void onBluetoothScan();
+    }
+  }, [bluetoothIsConnecting, connectedDevice, onBluetoothScan]);
+  const handleBluetoothPickerClose = useCallback(() => {
+    setBluetoothPickerVisible(false);
+    void onBluetoothStopScan();
+  }, [onBluetoothStopScan]);
 
   return (
-    <View onLayout={handleLayout} style={styles.root}>
+    <View
+      onLayout={handleLayout}
+      style={styles.root}
+    >
       <View style={[styles.canvas, { transform: [{ scale }] }]}>
         <View style={styles.topBar}>
           <View style={styles.brand}>
@@ -235,18 +350,33 @@ export function ControllerScreen({
               />
               <Text style={styles.sliderValue}>{motor2Speed}</Text>
             </View>
+            <SpeedPresetSelector
+              presets={presets}
+              motor1Speed={motor1Speed}
+              motor2Speed={motor2Speed}
+              joystickGesture={joystickGesture}
+              onSelectSpeed={onApplyPreset}
+            />
           </View>
 
           <View style={styles.rightTopStack}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={bluetoothConnected ? 'Disconnect Bluetooth' : 'Connect Bluetooth'}
-              onPress={onBluetoothToggle}
-              style={[styles.bluetoothButton, bluetoothConnected && styles.connectedButton]}
+              accessibilityLabel={
+                connectedDevice
+                  ? `Manage Bluetooth connection to ${nearbyDeviceName(connectedDevice)}`
+                  : 'Connect to a Bluetooth device'
+              }
+              onPress={handleBluetoothPress}
+              style={[styles.bluetoothButton, connectedDevice && styles.connectedButton]}
             >
               <Bluetooth color="#f47518" size={16} />
-              <Text style={styles.bluetoothText}>
-                {bluetoothConnected ? 'CONNECTED' : 'BLUETOOTH'}
+              <Text numberOfLines={1} style={styles.bluetoothText}>
+                {bluetoothIsConnecting
+                  ? 'CONNECTING'
+                  : connectedDevice
+                    ? nearbyDeviceName(connectedDevice).toUpperCase()
+                    : 'BLUETOOTH'}
               </Text>
             </Pressable>
 
@@ -275,12 +405,24 @@ export function ControllerScreen({
           <View pointerEvents="none" style={styles.gamepadBridge} />
 
           <View style={styles.gripCircle}>
-            <Joystick command={command} onCommandChange={onCommandChange} />
+            <Joystick
+              command={command}
+              position={joystickPosition}
+              gesture={joystickGesture}
+            />
           </View>
 
           <View style={styles.centerButtons}>
-            <FunctionButton label="FUNC 1" onPress={() => onAction('FUNC 1')} />
-            <FunctionButton label="FUNC 2" onPress={() => onAction('FUNC 2')} />
+            <FunctionButton
+              label="FUNC 1"
+              joystickGesture={joystickGesture}
+              onPress={() => onAction('FUNC 1')}
+            />
+            <FunctionButton
+              label="FUNC 2"
+              joystickGesture={joystickGesture}
+              onPress={() => onAction('FUNC 2')}
+            />
           </View>
 
           <View style={styles.gripCircle}>
@@ -290,6 +432,7 @@ export function ControllerScreen({
                 accessibilityLabel="Cản banh"
                 icon={<Triangle color="#fff" size={22} strokeWidth={2.5} />}
                 style={styles.actionTop}
+                joystickGesture={joystickGesture}
                 onPress={() => onAction('BLOCK (CẢN BANH)')}
               />
               <ActionButton
@@ -297,6 +440,7 @@ export function ControllerScreen({
                 accessibilityLabel="Sút banh"
                 icon={<X color="#fff" size={24} strokeWidth={2.5} />}
                 style={styles.actionBottom}
+                joystickGesture={joystickGesture}
                 onPress={() => onAction('KICK (SÚT BANH)')}
               />
               <ActionButton
@@ -304,6 +448,7 @@ export function ControllerScreen({
                 accessibilityLabel="Chức năng 3"
                 icon={<Square color="#fff" size={22} strokeWidth={2.2} />}
                 style={styles.actionLeft}
+                joystickGesture={joystickGesture}
                 onPress={() => onAction('FUNC 3')}
               />
               <ActionButton
@@ -311,12 +456,25 @@ export function ControllerScreen({
                 accessibilityLabel="Chức năng 4"
                 icon={<Circle color="#fff" size={22} strokeWidth={2.2} />}
                 style={styles.actionRight}
+                joystickGesture={joystickGesture}
                 onPress={() => onAction('FUNC 4')}
               />
             </View>
           </View>
         </View>
       </View>
+      <BluetoothPicker
+        visible={bluetoothPickerVisible}
+        devices={bluetoothDevices}
+        isScanning={bluetoothIsScanning}
+        isConnecting={bluetoothIsConnecting}
+        connectedDevice={connectedDevice}
+        error={bluetoothError}
+        onClose={handleBluetoothPickerClose}
+        onScan={onBluetoothScan}
+        onConnect={onBluetoothConnect}
+        onDisconnect={onBluetoothDisconnect}
+      />
     </View>
   );
 }
@@ -337,11 +495,14 @@ const styles = StyleSheet.create({
   },
   topBar: {
     alignItems: 'flex-start',
+    elevation: 5,
     flexDirection: 'row',
     height: 82,
     justifyContent: 'space-between',
     marginBottom: 10,
+    position: 'relative',
     width: 820,
+    zIndex: 5,
   },
   brand: {
     alignItems: 'center',
@@ -370,9 +531,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    position: 'relative',
+    zIndex: 10,
   },
   sliderItem: {
     alignItems: 'center',
@@ -386,7 +549,7 @@ const styles = StyleSheet.create({
   },
   motorSlider: {
     height: 24,
-    width: 120,
+    width: 104,
   },
   sliderValue: {
     color: '#f47518',
@@ -417,6 +580,7 @@ const styles = StyleSheet.create({
   },
   bluetoothText: {
     color: '#fff',
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -600,5 +764,8 @@ const styles = StyleSheet.create({
   },
   pressedButton: {
     backgroundColor: '#10b981',
+    borderColor: '#d1fae5',
+    opacity: 0.95,
+    transform: [{ scale: 0.94 }],
   },
 });

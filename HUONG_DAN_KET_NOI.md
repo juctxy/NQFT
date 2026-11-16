@@ -196,8 +196,9 @@ App được host miễn phí tại:
 ### 10.1. Android (Chrome)
 1. Bật **Bluetooth** trên điện thoại.
 2. Mở **Chrome** → vào link app.
-3. **Cài app lên màn hình chính (khuyến nghị):** bấm menu **⋮** → **Cài đặt ứng dụng / Thêm vào màn hình chính** → **Cài đặt**. Từ lần sau mở app từ icon "RC Car" như app bình thường, chạy được cả khi không có mạng.
-4. Không dùng Firefox, Opera Mini hay trình duyệt Facebook/Zalo (mở link trong Zalo/Messenger sẽ không có Bluetooth) — hãy **mở bằng Chrome**.
+3. **Cài app lên màn hình chính (khuyến nghị):** bấm nút **📲 Cài app** ở đầu trang (hoặc menu **⋮** → **Cài đặt ứng dụng / Thêm vào màn hình chính**) → **Cài đặt**. Từ lần sau mở app từ icon "RC Car" như app bình thường, chạy được cả khi không có mạng.
+4. Không dùng Firefox, Opera Mini hay trình duyệt Facebook/Zalo (mở link trong Zalo/Messenger sẽ không có Bluetooth) — trang sẽ hiện nút **Mở bằng Chrome**.
+5. **Hoặc cài bằng file APK:** tải tại <https://github.com/quanhuy38/NQFT/releases/latest> — cách tạo và cài APK: [`docs/HUONG_DAN_APK.md`](docs/HUONG_DAN_APK.md).
 
 ### 10.2. iPhone / iPad (Bluefy)
 Safari và mọi trình duyệt khác trên iOS **không hỗ trợ Web Bluetooth**. Cần dùng Bluefy:
@@ -295,7 +296,7 @@ Cần **Node.js LTS** (<https://nodejs.org>).
 
 ```bash
 cd web
-npm install
+npm ci
 npm run dev
 ```
 

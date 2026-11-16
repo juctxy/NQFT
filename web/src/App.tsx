@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useCar } from './hooks/useCar';
+import { chromeIntentUrl, detectPlatform, isInAppBrowser, useInstallPrompt } from './hooks/useInstallPrompt';
 import { isWebBluetoothSupported } from './transport/BleTransport';
 import type { ConnectionState } from './transport/Transport';
+
+const APK_URL = 'https://github.com/quanhuy38/NQFT/releases/latest';
+const BLUEFY_URL = 'https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055';
 
 // Trang kiểm tra kết nối tối giản — UI lái thật sẽ thiết kế ở giai đoạn sau.
 
@@ -12,20 +16,43 @@ const STATE_LABEL: Record<ConnectionState, string> = {
   reconnecting: 'Đang kết nối lại…',
 };
 
-function isIos(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
 function UnsupportedNotice() {
+  const platform = detectPlatform();
   return (
     <div className="notice">
-      <strong>Trình duyệt này không hỗ trợ Web Bluetooth.</strong>
-      {isIos() ? (
-        <p>Trên iPhone/iPad: cài trình duyệt <b>Bluefy</b> (miễn phí trên App Store) rồi mở lại trang này trong Bluefy.</p>
+      <strong>Trình duyệt này không hỗ trợ Bluetooth.</strong>
+      {platform === 'ios' ? (
+        <>
+          <p>Trên iPhone/iPad: cài trình duyệt <b>Bluefy</b> (miễn phí) rồi mở lại trang này trong Bluefy.</p>
+          <a className="button" href={BLUEFY_URL} target="_blank" rel="noreferrer">Tải Bluefy trên App Store</a>
+        </>
+      ) : platform === 'android' && isInAppBrowser() ? (
+        <>
+          <p>Bạn đang mở trong ứng dụng khác (Zalo, Facebook…). Hãy mở bằng <b>Chrome</b>.</p>
+          <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
+        </>
+      ) : platform === 'android' ? (
+        <>
+          <p>Hãy mở trang này bằng <b>Chrome</b>, hoặc cài file APK.</p>
+          <div className="row">
+            <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
+            <a className="button secondary" href={APK_URL} target="_blank" rel="noreferrer">Tải APK</a>
+          </div>
+        </>
       ) : (
-        <p>Hãy mở bằng <b>Chrome</b> hoặc <b>Edge</b> (Android, Windows, macOS, Linux). Firefox và Safari không hỗ trợ.</p>
+        <p>Hãy mở bằng <b>Chrome</b> hoặc <b>Edge</b>. Firefox và Safari không hỗ trợ.</p>
       )}
+    </div>
+  );
+}
+
+function InstallBanner() {
+  const { canInstall, install } = useInstallPrompt();
+  if (!canInstall) return null;
+  return (
+    <div className="install">
+      <span>Cài <b>RC Car</b> lên màn hình chính để mở nhanh, chạy cả khi không có mạng.</span>
+      <button onClick={install}>📲 Cài app</button>
     </div>
   );
 }
@@ -79,6 +106,7 @@ export default function App() {
       <h1>RC Car — Kiểm tra kết nối</h1>
 
       {!supported && <UnsupportedNotice />}
+      {supported && <InstallBanner />}
 
       <section className="card">
         <div className={`state state-${status.state}`}>{STATE_LABEL[status.state]}</div>

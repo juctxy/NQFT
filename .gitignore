@@ -7,3 +7,10 @@ dev-dist/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Khóa ký APK / file APK (KHÔNG commit)
+*.keystore
+*.jks
+signing-key-info.txt
+*.apk
+*.aab

@@ -140,7 +140,7 @@
 ### 4.4. Chạy PWA
 ```bash
 cd web
-npm install
+npm ci
 npm run dev          # https://localhost:5173 và https://<IP-LAN>:5173
 npm test             # chạy unit test
 npm run build        # build production vào web/dist

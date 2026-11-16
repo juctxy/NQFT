@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useCar } from './hooks/useCar';
-import { chromeIntentUrl, detectPlatform, isInAppBrowser, useInstallPrompt } from './hooks/useInstallPrompt';
+import {
+  chromeIntentUrl,
+  detectPlatform,
+  isBraveBrowser,
+  isInAppBrowser,
+  useInstallPrompt,
+} from './hooks/useInstallPrompt';
 import { isWebBluetoothSupported } from './transport/BleTransport';
 import type { ConnectionState } from './transport/Transport';
 
@@ -41,6 +47,25 @@ function UnsupportedNotice() {
         </>
       ) : (
         <p>Hãy mở bằng <b>Chrome</b> hoặc <b>Edge</b>. Firefox và Safari không hỗ trợ.</p>
+      )}
+    </div>
+  );
+}
+
+const STATE_HINT: Record<ConnectionState, string> = {
+  disconnected: 'Chưa kết nối — chỉ nút Kết nối hoạt động. Bấm Kết nối rồi chọn xe RC-Car-XXXX.',
+  connecting: 'Đang kết nối — chờ vài giây…',
+  connected: 'Đã kết nối — kéo thanh Ga / Lái để gửi lệnh thử.',
+  reconnecting: 'Mất kết nối — đang tự kết nối lại. Bấm Ngắt kết nối để dừng.',
+};
+
+function BraveNotice() {
+  return (
+    <div className="notice">
+      <strong>Bạn đang dùng Brave — Brave chặn Bluetooth cho trang web.</strong>
+      <p>Hãy mở app bằng <b>Google Chrome</b> (và cài app từ Chrome).</p>
+      {detectPlatform() === 'android' && (
+        <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
       )}
     </div>
   );
@@ -106,14 +131,21 @@ export default function App() {
       <h1>RC Car — Kiểm tra kết nối</h1>
 
       {!supported && <UnsupportedNotice />}
-      {supported && <InstallBanner />}
+      {supported && isBraveBrowser() && <BraveNotice />}
+      {supported && !isBraveBrowser() && <InstallBanner />}
 
       <section className="card">
         <div className={`state state-${status.state}`}>{STATE_LABEL[status.state]}</div>
+        <div className="hint">{STATE_HINT[status.state]}</div>
         {status.deviceName && <div>Thiết bị: {status.deviceName}</div>}
         {status.error && <div className="error">{status.error}</div>}
+        {(status.errorCode === 'disabled' || status.errorCode === 'unsupported') &&
+          detectPlatform() === 'android' && !isBraveBrowser() && (
+            <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
+          )}
         <div className="row">
-          <button onClick={connect} disabled={!supported || status.state !== 'disconnected'}>
+          {/* Không khóa khi trình duyệt thiếu Bluetooth: bấm vẫn hiện lý do thay vì "không có gì xảy ra". */}
+          <button onClick={connect} disabled={status.state !== 'disconnected'}>
             Kết nối
           </button>
           <button onClick={disconnect} disabled={status.state === 'disconnected'}>

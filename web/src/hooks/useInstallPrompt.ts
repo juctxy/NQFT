@@ -22,6 +22,11 @@ export function isInAppBrowser(): boolean {
   return /Zalo|FBAN|FBAV|FB_IAB|Instagram|Line\/|Messenger|TikTok|Snapchat|; wv\)/i.test(navigator.userAgent);
 }
 
+/** Brave có navigator.bluetooth nhưng mặc định chặn Web Bluetooth. */
+export function isBraveBrowser(): boolean {
+  return 'brave' in navigator;
+}
+
 /** Link mở trang hiện tại bằng Chrome trên Android. */
 export function chromeIntentUrl(): string {
   const { host, pathname, search, hash } = window.location;

@@ -2,10 +2,20 @@ import type { Telemetry } from '../protocol/packet';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
+/** Loại lỗi để UI gợi ý cách xử lý phù hợp. */
+export type TransportErrorCode =
+  | 'unsupported' // trình duyệt không có Web Bluetooth
+  | 'disabled' // có API nhưng trình duyệt chặn (Brave, chính sách…)
+  | 'adapter-off' // Bluetooth của máy đang tắt
+  | 'permission' // thiếu quyền Thiết bị ở gần / Vị trí
+  | 'connection' // lỗi khi kết nối GATT
+  | 'other';
+
 export interface TransportStatus {
   state: ConnectionState;
   deviceName: string | null;
   error: string | null;
+  errorCode: TransportErrorCode | null;
 }
 
 /**

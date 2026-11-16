@@ -17,11 +17,14 @@ export default defineConfig(({ command }) => ({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       pwaAssets: { config: true },
+      // Các trường PWABuilder kiểm tra (bắt buộc + khuyến nghị). Icons do pwaAssets tự thêm.
       manifest: {
+        id: base, // định danh cố định của app (GitHub Pages: /NQFT/)
         name: 'RC Car Controller',
         short_name: 'RC Car',
-        description: 'Điều khiển xe RC dùng ESP32 qua Bluetooth',
+        description: 'Điều khiển xe RC dùng ESP32 qua Bluetooth Low Energy, ngay trên trình duyệt điện thoại.',
         lang: 'vi',
+        dir: 'ltr',
         start_url: '.',
         scope: '.',
         display: 'fullscreen',
@@ -29,6 +32,26 @@ export default defineConfig(({ command }) => ({
         orientation: 'landscape',
         background_color: '#111318',
         theme_color: '#111318',
+        categories: ['utilities', 'entertainment'],
+        prefer_related_applications: false,
+        launch_handler: { client_mode: 'focus-existing' },
+        handle_links: 'preferred',
+        screenshots: [
+          {
+            src: 'screenshots/wide.png',
+            sizes: '1280x720',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Màn hình kiểm tra kết nối trên máy tính',
+          },
+          {
+            src: 'screenshots/narrow.png',
+            sizes: '412x732',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Màn hình kiểm tra kết nối trên điện thoại',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],

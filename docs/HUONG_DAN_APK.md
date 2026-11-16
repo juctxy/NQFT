@@ -8,6 +8,29 @@ Dành cho **chủ repo**. Làm một lần (~10 phút). Sau đó người dùng 
 
 ---
 
+## Bước 0 — Kiểm tra app đã lên GitHub Pages đúng cách (BẮT BUỘC)
+
+PWABuilder đọc **file manifest trên trang web thật**. Nếu GitHub Pages đang hiển thị README thay vì app, PWABuilder sẽ báo *không có manifest* và bắt bạn "Edit manifest".
+
+1. Repo → **Settings → Pages → Build and deployment → Source** phải là **GitHub Actions** (không phải *Deploy from a branch*).
+2. Tab **Actions** → workflow **Deploy PWA to GitHub Pages** mới nhất phải có dấu ✅ (nếu ❌ hoặc chưa có → **Run workflow**).
+3. Mở 2 link sau, phải đúng như mô tả:
+
+| Link | Phải thấy |
+|---|---|
+| <https://quanhuy38.github.io/NQFT/> | Trang **"RC Car — Kiểm tra kết nối"** (nền tối, nút Kết nối) — **không phải** trang README |
+| <https://quanhuy38.github.io/NQFT/manifest.webmanifest> | Một đoạn JSON bắt đầu bằng `{"name":"RC Car Controller",…` — **không phải** trang 404 |
+
+Chỉ khi cả 2 đúng mới sang Bước 1.
+
+### Về mục "Edit manifest" trong PWABuilder
+- Manifest của app **đã có đủ** các trường PWABuilder yêu cầu và khuyến nghị: `name`, `short_name`, `start_url`, `display`, icons 192/512 + maskable, `id`, `description`, `screenshots` (wide + narrow), `categories`, `theme_color`, `background_color`, `orientation`, `lang`, `dir`, `scope`, `display_override`, `launch_handler`, `prefer_related_applications`…
+- **Không cần sửa manifest trong PWABuilder.** Trình sửa của PWABuilder **không thay đổi trang web thật** — nó chỉ cho tải về file manifest mới, bạn vẫn phải tự đưa vào code và deploy.
+- Các mục **màu vàng** (optional) như *share_target, protocol_handlers, file_handlers, widgets, shortcuts, iarc_rating_id, related_applications, edge_side_panel…* **không chặn** việc đóng gói — bỏ qua được.
+- Nếu PWABuilder báo **màu đỏ** (bắt buộc) ở trường nào: sửa trong `web/vite.config.ts` (phần `manifest:`), push lên `main`, đợi deploy xong, rồi bấm **Retest / phân tích lại** trên PWABuilder.
+
+---
+
 ## Bước 1 — Tạo APK bằng PWABuilder
 
 1. Mở <https://www.pwabuilder.com> trên máy tính.

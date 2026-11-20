@@ -311,9 +311,13 @@ export function ControllerScreen({
       setWebViewportSize({ width: window.innerWidth, height: window.innerHeight });
     };
     updateViewportSize();
+    const initialFrame = window.requestAnimationFrame(updateViewportSize);
     window.addEventListener('resize', updateViewportSize);
+    window.addEventListener('orientationchange', updateViewportSize);
     return () => {
+      window.cancelAnimationFrame(initialFrame);
       window.removeEventListener('resize', updateViewportSize);
+      window.removeEventListener('orientationchange', updateViewportSize);
     };
   }, []);
   const viewportSize = Platform.OS === 'web' ? webViewportSize : windowSize;

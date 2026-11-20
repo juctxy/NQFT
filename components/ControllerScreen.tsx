@@ -298,9 +298,11 @@ export function ControllerScreen({
     height: windowSize.height,
   });
   const [bluetoothPickerVisible, setBluetoothPickerVisible] = useState(false);
-  const [webViewportSize, setWebViewportSize] = useState({
-    width: windowSize.width,
-    height: windowSize.height,
+  const [webViewportSize, setWebViewportSize] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return { width: window.innerWidth, height: window.innerHeight };
+    }
+    return { width: windowSize.width, height: windowSize.height };
   });
   useEffect(() => {
     if (Platform.OS !== 'web') return;

@@ -1,135 +1,53 @@
-# NQFT – Robot Controller App
+# NQFT Robot Controller
 
----
+Ứng dụng điều khiển xe robot dùng Expo, React Native và Bluetooth Low Energy.
 
-## 1. Yêu cầu môi trường
+## Cài đặt và chạy
 
-Trước khi chạy ứng dụng, hãy cài đặt:
-
-- **Node.js** (bao gồm `npm`)
-- **Git**
-- **Expo Go** trên điện thoại (chỉ dùng để thử giao diện); kết nối BLE cần development build
-
-Kiểm tra nhanh trong Terminal:
-
-```bash
-node -v
-npm -v
-git --version
-```
-
----
-
-## 2. Clone Repository
-
-Mở Terminal tại thư mục muốn lưu dự án và chạy:
-
-```bash
-# Clone branch có ứng dụng Expo
-git clone -b layout3_mobile --single-branch https://github.com/juctxy/NQFT.git
-
-# Di chuyển vào thư mục dự án
-cd NQFT
-```
-
-> **Lưu ý:** Ứng dụng Expo nằm ở thư mục gốc của repository. Hãy chạy các lệnh cài đặt, khởi chạy và kiểm tra tại thư mục `NQFT`.
-
----
-
-## 3. Cài đặt thư viện
-
-Đảm bảo Terminal đang ở thư mục gốc `NQFT`, sau đó chạy:
+Yêu cầu Node.js và npm. Tại thư mục gốc:
 
 ```bash
 npm ci
+npx expo start
 ```
 
-Lệnh này cài các phiên bản thư viện đã khóa trong `package-lock.json`.
-
----
-
-## 4. Khởi chạy ứng dụng
-
-Chạy Expo ở chế độ Expo Go qua tunnel:
+Expo Go chỉ dùng để xem giao diện. Bluetooth cần development build có native module `react-native-ble-manager`:
 
 ```bash
-npx expo start --go 
+npx expo run:android
+# hoặc
+npx expo run:ios
 ```
 
-Mở ứng dụng trên điện thoại:
+## Chức năng
 
-1. Chờ Terminal hiển thị mã QR.
-2. Mở **Expo Go** trên điện thoại.
-3. Dùng trình quét QR bên trong Expo Go để quét mã.
-4. Chờ ứng dụng tải về điện thoại.
+- Joystick analog 360° với deadzone và giới hạn đường tròn; Standard dùng trái/phải để quay tại chỗ, Omni/Mecanum có nút giữ để xoay.
+- Chọn mức Chậm / Vừa / Nhanh khi đang điều khiển.
+- Cài đặt tiếng Việt gồm loại bánh, ma trận dấu, tốc độ riêng cho từng mức, PWM tối thiểu/tối đa, đảo chiều và bù từng bánh, tăng tốc mềm.
+- Quản lý nhiều hồ sơ trên điện thoại; hỗ trợ tải, ghi đè, nhân bản, đổi tên, xóa, chuyển nhanh A/B và nhập/xuất tệp JSON.
+- Kết nối BLE, gửi lệnh điều khiển ở 25 Hz, áp dụng cấu hình và lưu cấu hình vào bộ nhớ không mất dữ liệu của xe sau khi nhận ACK.
+- Màn hình cài đặt có nút dừng, trạng thái kết nối/pin và trạng thái đồng bộ.
 
+## Giao thức BLE và firmware
 
----
+Ứng dụng hiện định nghĩa một giao thức BLE đề xuất trong [`docs/drive-protocol.md`](./docs/drive-protocol.md). Firmware ESP32 trong repository này chưa được cung cấp; do đó UUID, packet, ACK, watchdog, điều khiển motor, tăng tốc mềm và lưu NVS phải được triển khai hoặc xác nhận tương thích ở firmware trước khi chạy xe thật. Không thể xác minh điều khiển phần cứng chỉ bằng ứng dụng.
 
-## 4. Các chức năng hiện tại
-
-- **Joystick 8 hướng:** Điều khiển joystick và di chuyển theo các hướng; có thể giữ joystick trong khi chạm một nút chức năng hoặc chọn tốc độ.
-- **Điều chỉnh tốc độ:** Chọn nhanh preset Chậm/Vừa/Nhanh ngay trên bộ điều khiển; hai thanh chỉnh Motor 1 và Motor 2 vẫn hoạt động riêng, còn giá trị preset được chỉnh trong Settings.
-- **Nút chức năng:** Có các nút `FUNC 1–4`, `CẢN` và `SÚT`.
-- **Hướng dẫn và cài đặt:** Có màn hình hướng dẫn và các tùy chọn cài đặt PWM.
-- **Bluetooth BLE:** Quét thiết bị gần đó, kết nối/ngắt kết nối ESP32; cần development build và thiết bị thật. Chưa gửi lệnh điều khiển robot.
-- **Hiển thị ngang:** Ứng dụng được cấu hình cho chế độ landscape.
-- **Nhận diện ứng dụng:** Hiển thị logo và tên “Watt'up Debuggers” trên giao diện điều khiển.
-
----
-
-
-## 5. Cấu trúc ứng dụng mobile
-
-```text
-NQFT/
-    ├── app/                  # Các route Expo Router
-    ├── assets/               # Logo, icon và hình ảnh
-    ├── components/           # Controller, hướng dẫn và cài đặt
-    ├── context/              # Trạng thái controller
-    ├── App.tsx               # Kết nối màn hình controller và điều hướng
-    ├── app.json              # Cấu hình Expo
-    ├── controller.ts         # Logic điều khiển và PWM
-    ├── controller.test.mjs   # Kiểm tra logic controller
-    ├── package.json          # Dependencies và scripts của ứng dụng mobile
-    ├── package-lock.json     # Khóa phiên bản dependencies
-    ├── tsconfig.json         # Cấu hình TypeScript
-    └── README.md             # Hướng dẫn này
-=======
-## 6. Kiểm tra ứng dụng
-
-Chạy các kiểm tra logic của controller:
+## Kiểm tra
 
 ```bash
 npm test
-```
-
-`npm test` cũng chạy các kiểm tra logic BLE.
-
-Kiểm tra TypeScript:
-
-```bash
 npx tsc --noEmit
+npx expo lint
 ```
 
----
-
-## 7. Cấu trúc ứng dụng mobile
+## Cấu trúc chính
 
 ```text
-NQFT/
-├── app/                      # Các route Expo Router
-├── assets/                   # Logo, icon và hình ảnh
-├── components/               # Controller, Bluetooth, hướng dẫn và cài đặt
-├── context/                  # Trạng thái controller
-├── hooks/                    # Hook kết nối BLE
-├── App.tsx                   # Màn hình controller
-├── app.json                  # Cấu hình Expo
-├── bluetooth.ts              # Helpers và state BLE
-├── controller.ts             # Logic điều khiển và PWM
-├── package.json              # Dependencies và scripts
-├── package-lock.json         # Khóa phiên bản dependencies
-├── tsconfig.json             # Cấu hình TypeScript
-└── README.md                 # Hướng dẫn này
->>>>>>> f32ebf4 (update)
+app/                         Expo Router routes
+components/                  Màn hình điều khiển và cài đặt
+context/                     Trạng thái cài đặt và kết nối BLE dùng chung
+hooks/useBluetoothConnection.ts
+drive.ts                     Cấu hình, phối trộn motor và mã hóa packet BLE
+controller.test.mjs          Kiểm thử logic lái và packet
+bluetooth.test.mjs           Kiểm thử trạng thái Bluetooth
 ```

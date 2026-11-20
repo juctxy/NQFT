@@ -23,8 +23,8 @@ const INSTRUCTIONS = [
   },
   {
     number: '4',
-    title: 'Kết Nối & Cài Đặt Nhanh',
-    body: 'Bấm BLUETOOTH để ghép nối thiết bị. Dùng FUNC 1/2 cho lệnh phụ và icon bánh răng để chỉnh sẵn mức xung tốc độ.',
+    title: 'Chế Độ Lái & Hồ Sơ',
+    body: 'Trong Settings, chọn Standard, Omni hoặc Mecanum rồi chỉnh V_main, V_side, V_sub, trim và soft-start. Lưu tối đa 3 hồ sơ trên điện thoại; chọn nhanh hồ sơ trên bộ điều khiển. BLE hiện chỉ kết nối, chưa gửi lệnh đến ESP32.',
   },
 ];
 

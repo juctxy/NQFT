@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import Slider from '@react-native-community/slider';
 import {
   GestureDetector,
   usePanGesture,
@@ -32,34 +31,36 @@ import {
 } from 'react-native';
 import { BluetoothPicker } from './BluetoothPicker';
 import { nearbyDeviceName, type NearbyDevice } from '../bluetooth';
+import { clampJoystick } from '../controller';
+import type { DriveMode } from '../controller';
 import {
-  clampJoystick,
-  determineDirection,
-  getChangedCommand,
-  type CommandType,
-  type SpeedPresets,
-} from '../controller';
+  normalizeJoystick,
+  type DriveProfile,
+  type JoystickVector,
+  type SpeedLevel,
+} from '../drive';
 import { SpeedPresetSelector } from './SpeedPresetSelector';
 
-const CANVAS_WIDTH = 780;
-const CANVAS_HEIGHT = 360;
+const CANVAS_WIDTH = 840;
+const CANVAS_HEIGHT = 380;
 const JOYSTICK_SIZE = 190;
 const JOYSTICK_RADIUS = 60;
 
 interface ControllerScreenProps {
-  motor1Speed: number;
-  motor2Speed: number;
-  presets: SpeedPresets;
-  command: string;
+  driveProfile: DriveProfile;
+  driveProfiles: DriveProfile[];
+  activeLevel: SpeedLevel;
+  driveSettingsReady: boolean;
   bluetoothDevices: NearbyDevice[];
   connectedDevice: NearbyDevice | null;
   bluetoothIsScanning: boolean;
   bluetoothIsConnecting: boolean;
   bluetoothError: string | null;
-  onMotor1SpeedChange: (value: number) => void;
-  onMotor2SpeedChange: (value: number) => void;
-  onApplyPreset: (value: number) => void;
-  onCommandChange: (command: CommandType) => void;
+  actionLabel: string;
+  onSelectSpeedLevel: (level: SpeedLevel) => void;
+  onSelectProfile: (id: string) => void;
+  onControlChange: (joystick: JoystickVector) => void;
+  onRotateChange: (rotate: -1 | 0 | 1) => void;
   onAction: (action: string) => void;
   onBluetoothScan: () => Promise<void>;
   onBluetoothStopScan: () => Promise<void>;
@@ -70,19 +71,24 @@ interface ControllerScreenProps {
 }
 
 function Joystick({
-  command,
+  wheelType,
   position,
   gesture,
+  actionLabel,
 }: {
-  command: string;
+  wheelType: DriveMode;
   position: Animated.ValueXY;
   gesture: PanGesture;
+  actionLabel: string;
 }) {
   return (
     <GestureDetector gesture={gesture}>
       <View
-        accessibilityLabel="Eight-direction joystick"
-        accessibilityHint={`Current command: ${command}`}
+        accessible
+        accessibilityLabel="Cần điều khiển analog 360 độ"
+        accessibilityHint={`${wheelType === 'standard'
+          ? 'Lên xuống để tiến lùi, trái phải để quay tại chỗ'
+          : 'Điều khiển xe di chuyển liên tục theo mọi hướng'}. Chức năng gần nhất: ${actionLabel}`}
         accessibilityRole="adjustable"
         style={styles.joystick}
       >
@@ -195,20 +201,46 @@ function ActionButton({
   );
 }
 
+function RotateHoldButton({
+  label,
+  direction,
+  onRotateChange,
+}: {
+  label: string;
+  direction: -1 | 1;
+  onRotateChange: (rotate: -1 | 0 | 1) => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPressIn={() => onRotateChange(direction)}
+      onPressOut={() => onRotateChange(0)}
+      style={({ pressed }) => [
+        styles.rotateButton,
+        pressed && styles.pressedButton,
+      ]}
+    >
+      <Text style={styles.rotateButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function ControllerScreen({
-  motor1Speed,
-  motor2Speed,
-  presets,
-  command,
+  driveProfile,
+  driveProfiles,
+  activeLevel,
+  driveSettingsReady,
   bluetoothDevices,
   connectedDevice,
   bluetoothIsScanning,
   bluetoothIsConnecting,
   bluetoothError,
-  onMotor1SpeedChange,
-  onMotor2SpeedChange,
-  onApplyPreset,
-  onCommandChange,
+  actionLabel,
+  onSelectSpeedLevel,
+  onSelectProfile,
+  onControlChange,
+  onRotateChange,
   onAction,
   onBluetoothScan,
   onBluetoothStopScan,
@@ -221,20 +253,6 @@ export function ControllerScreen({
     () => new Animated.ValueXY({ x: 0, y: 0 }),
   );
   const joystickOrigin = useRef({ x: 0, y: 0 });
-  const lastPublishedCommand = useRef<CommandType>('STOP');
-  const publishCommand = useCallback(
-    (nextCommand: CommandType) => {
-      const changedCommand = getChangedCommand(
-        lastPublishedCommand.current,
-        nextCommand,
-      );
-      if (changedCommand === null) return;
-
-      lastPublishedCommand.current = changedCommand;
-      onCommandChange(changedCommand);
-    },
-    [onCommandChange],
-  );
   const updateJoystickPosition = useCallback(
     (x: number, y: number) => {
       const next = clampJoystick(
@@ -243,14 +261,17 @@ export function ControllerScreen({
         JOYSTICK_RADIUS,
       );
       joystickPosition.setValue(next);
-      publishCommand(determineDirection(next.x, next.y));
+      onControlChange(
+        normalizeJoystick(next.x / JOYSTICK_RADIUS, -next.y / JOYSTICK_RADIUS),
+      );
     },
-    [joystickPosition, publishCommand],
+    [joystickPosition, onControlChange],
   );
   const resetJoystick = useCallback(() => {
     joystickPosition.setValue({ x: 0, y: 0 });
-    publishCommand('STOP');
-  }, [joystickPosition, publishCommand]);
+    onControlChange({ x: 0, y: 0 });
+    onRotateChange(0);
+  }, [joystickPosition, onControlChange, onRotateChange]);
   const joystickGestureConfig = useMemo<PanGestureConfig>(
     () => ({
       runOnJS: true,
@@ -314,49 +335,46 @@ export function ControllerScreen({
             </Text>
           </View>
 
-          <View style={styles.slidersGroup}>
-            <View style={styles.sliderItem}>
-              <Text style={styles.motorLabel}>M1:</Text>
-              <Slider
-                accessibilityLabel="M1 PWM speed"
-                accessibilityValue={{ min: 0, max: 255, now: motor1Speed }}
-                minimumValue={0}
-                maximumValue={255}
-                step={1}
-                value={motor1Speed}
-                onValueChange={onMotor1SpeedChange}
-                minimumTrackTintColor="#f47518"
-                maximumTrackTintColor="#444444"
-                thumbTintColor="#f47518"
-                style={styles.motorSlider}
-              />
-              <Text style={styles.sliderValue}>{motor1Speed}</Text>
-            </View>
-
-            <View style={styles.sliderItem}>
-              <Text style={styles.motorLabel}>M2:</Text>
-              <Slider
-                accessibilityLabel="M2 PWM speed"
-                accessibilityValue={{ min: 0, max: 255, now: motor2Speed }}
-                minimumValue={0}
-                maximumValue={255}
-                step={1}
-                value={motor2Speed}
-                onValueChange={onMotor2SpeedChange}
-                minimumTrackTintColor="#f47518"
-                maximumTrackTintColor="#444444"
-                thumbTintColor="#f47518"
-                style={styles.motorSlider}
-              />
-              <Text style={styles.sliderValue}>{motor2Speed}</Text>
-            </View>
+          <View style={styles.levelGroup}>
+            <Text style={styles.wheelTypeLabel}>
+              Bánh: {driveProfile.wheelType === 'standard'
+                ? 'Standard'
+                : driveProfile.wheelType === 'omni'
+                  ? 'Omni'
+                  : 'Mecanum'}
+            </Text>
             <SpeedPresetSelector
-              presets={presets}
-              motor1Speed={motor1Speed}
-              motor2Speed={motor2Speed}
+              level={activeLevel}
+              ready={driveSettingsReady}
               joystickGesture={joystickGesture}
-              onSelectSpeed={onApplyPreset}
+              onSelectLevel={onSelectSpeedLevel}
             />
+            {driveProfiles.slice(0, 2).length > 1 ? (
+              <View style={styles.quickSwitchRow}>
+                {driveProfiles.slice(0, 2).map((profile, index) => (
+                  <Pressable
+                    key={profile.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Chọn nhanh hồ sơ ${index === 0 ? 'A' : 'B'}: ${profile.name}`}
+                    accessibilityState={{ selected: profile.id === driveProfile.id }}
+                    onPress={() => onSelectProfile(profile.id)}
+                    style={[
+                      styles.quickSwitchButton,
+                      profile.id === driveProfile.id && styles.quickSwitchButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.quickSwitchText,
+                        profile.id === driveProfile.id && styles.quickSwitchTextActive,
+                      ]}
+                    >
+                      {index === 0 ? 'A' : 'B'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.rightTopStack}>
@@ -406,9 +424,10 @@ export function ControllerScreen({
 
           <View style={styles.gripCircle}>
             <Joystick
-              command={command}
+              wheelType={driveProfile.wheelType}
               position={joystickPosition}
               gesture={joystickGesture}
+              actionLabel={actionLabel}
             />
           </View>
 
@@ -423,6 +442,20 @@ export function ControllerScreen({
               joystickGesture={joystickGesture}
               onPress={() => onAction('FUNC 2')}
             />
+            {driveProfile.wheelType !== 'standard' ? (
+              <View style={styles.rotateControls}>
+                <RotateHoldButton
+                  label="XOAY TRÁI"
+                  direction={-1}
+                  onRotateChange={onRotateChange}
+                />
+                <RotateHoldButton
+                  label="XOAY PHẢI"
+                  direction={1}
+                  onRotateChange={onRotateChange}
+                />
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.gripCircle}>
@@ -524,40 +557,45 @@ const styles = StyleSheet.create({
   brandAccent: {
     color: '#0b8795',
   },
-  slidersGroup: {
+  levelGroup: {
     alignItems: 'center',
     backgroundColor: '#fff',
     borderColor: '#cbd5e1',
     borderRadius: 12,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     position: 'relative',
     zIndex: 10,
   },
-  sliderItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  motorLabel: {
+  wheelTypeLabel: {
     color: '#334155',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
-  motorSlider: {
+  quickSwitchRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  quickSwitchButton: {
+    alignItems: 'center',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 5,
     height: 24,
-    width: 104,
+    justifyContent: 'center',
+    width: 28,
   },
-  sliderValue: {
-    color: '#f47518',
-    fontFamily: 'monospace',
-    fontSize: 13,
-    fontWeight: '700',
-    minWidth: 30,
-    textAlign: 'right',
+  quickSwitchButtonActive: {
+    backgroundColor: '#f47518',
+  },
+  quickSwitchText: {
+    color: '#334155',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  quickSwitchTextActive: {
+    color: '#fff',
   },
   rightTopStack: {
     alignItems: 'stretch',
@@ -697,9 +735,27 @@ const styles = StyleSheet.create({
     width: 24,
   },
   centerButtons: {
-    gap: 16,
+    alignItems: 'center',
+    gap: 12,
     marginTop: -40,
     zIndex: 2,
+  },
+  rotateControls: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  rotateButton: {
+    alignItems: 'center',
+    backgroundColor: '#0b8795',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 34,
+    paddingHorizontal: 8,
+  },
+  rotateButtonText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
   },
   functionButton: {
     alignItems: 'center',

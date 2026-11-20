@@ -298,60 +298,23 @@ export function ControllerScreen({
     height: windowSize.height,
   });
   const [bluetoothPickerVisible, setBluetoothPickerVisible] = useState(false);
-  const [webViewportSize, setWebViewportSize] = useState(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return { width: window.innerWidth, height: window.innerHeight };
-    }
-    return { width: windowSize.width, height: windowSize.height };
+  const [webViewportSize, setWebViewportSize] = useState({
+    width: windowSize.width,
+    height: windowSize.height,
   });
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
     const updateViewportSize = () => {
-      const { clientWidth, clientHeight } = document.documentElement;
-      const width = window.innerWidth || clientWidth;
-      const height = window.innerHeight || clientHeight;
-      setWebViewportSize((currentSize) =>
-        currentSize.width === width && currentSize.height === height
-          ? currentSize
-          : { width, height },
-      );
+      setWebViewportSize({ width: window.innerWidth, height: window.innerHeight });
     };
-    const viewportObserver = new ResizeObserver(updateViewportSize);
-    viewportObserver.observe(document.documentElement);
     updateViewportSize();
-    const initialFrame = window.requestAnimationFrame(updateViewportSize);
     window.addEventListener('resize', updateViewportSize);
-    window.addEventListener('orientationchange', updateViewportSize);
-    window.visualViewport?.addEventListener('resize', updateViewportSize);
     return () => {
-      viewportObserver.disconnect();
-      window.cancelAnimationFrame(initialFrame);
       window.removeEventListener('resize', updateViewportSize);
-      window.removeEventListener('orientationchange', updateViewportSize);
-      window.visualViewport?.removeEventListener('resize', updateViewportSize);
     };
   }, []);
-  const browserViewportSize =
-    Platform.OS === 'web' && typeof window !== 'undefined'
-      ? {
-          width:
-            window.visualViewport?.width ||
-            window.innerWidth ||
-            (typeof document !== 'undefined' ? document.documentElement?.clientWidth : 0) ||
-            0,
-          height:
-            window.visualViewport?.height ||
-            window.innerHeight ||
-            (typeof document !== 'undefined' ? document.documentElement?.clientHeight : 0) ||
-            0,
-        }
-      : windowSize;
-  const viewportSize =
-    Platform.OS === 'web' &&
-    (browserViewportSize.width === 0 || browserViewportSize.height === 0)
-      ? webViewportSize
-      : browserViewportSize;
+  const viewportSize = Platform.OS === 'web' ? webViewportSize : windowSize;
   const scale = scaleControllerCanvas(
     Platform.OS,
     viewportSize,

@@ -308,13 +308,23 @@ export function ControllerScreen({
     if (Platform.OS !== 'web') return;
 
     const updateViewportSize = () => {
-      setWebViewportSize({ width: window.innerWidth, height: window.innerHeight });
+      const { clientWidth, clientHeight } = document.documentElement;
+      const width = window.innerWidth || clientWidth;
+      const height = window.innerHeight || clientHeight;
+      setWebViewportSize((currentSize) =>
+        currentSize.width === width && currentSize.height === height
+          ? currentSize
+          : { width, height },
+      );
     };
+    const viewportObserver = new ResizeObserver(updateViewportSize);
+    viewportObserver.observe(document.documentElement);
     updateViewportSize();
     const initialFrame = window.requestAnimationFrame(updateViewportSize);
     window.addEventListener('resize', updateViewportSize);
     window.addEventListener('orientationchange', updateViewportSize);
     return () => {
+      viewportObserver.disconnect();
       window.cancelAnimationFrame(initialFrame);
       window.removeEventListener('resize', updateViewportSize);
       window.removeEventListener('orientationchange', updateViewportSize);

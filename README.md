@@ -19,6 +19,20 @@ npx expo run:android
 npx expo run:ios
 ```
 
+## Bản web/PWA
+
+Ứng dụng có thể chạy dưới dạng PWA trên HTTPS:
+
+```bash
+npm run start:web
+npm run build:web
+npm run serve:web
+```
+
+GitHub Actions build và deploy `dist/` lên GitHub Pages khi có push lên `main` hoặc `layout3_mobile2`. Trong GitHub, đặt **Settings → Pages → Build and deployment → Source** thành **GitHub Actions**. Sau khi deploy, mở URL HTTPS bằng Chrome trên Android hoặc Bluefy trên iPhone; Safari iOS không hỗ trợ Web Bluetooth.
+
+Web Bluetooth chỉ hoạt động trong trình duyệt hỗ trợ, trên HTTPS (localhost được xem là môi trường bảo mật) và sau thao tác bấm kết nối của người dùng. Bản web sử dụng cùng giao thức NQFT đề xuất ở [`docs/drive-protocol.md`](./docs/drive-protocol.md), nhưng giao thức và đầu ra PWM trên xe vẫn cần firmware tương thích.
+
 ## Chức năng
 
 - Joystick analog 360° với deadzone và giới hạn đường tròn; Standard dùng trái/phải để quay tại chỗ, Omni/Mecanum có nút giữ để xoay.
@@ -31,6 +45,8 @@ npx expo run:ios
 ## Giao thức BLE và firmware
 
 Ứng dụng hiện định nghĩa một giao thức BLE đề xuất trong [`docs/drive-protocol.md`](./docs/drive-protocol.md). Firmware ESP32 trong repository này chưa được cung cấp; do đó UUID, packet, ACK, watchdog, điều khiển motor, tăng tốc mềm và lưu NVS phải được triển khai hoặc xác nhận tương thích ở firmware trước khi chạy xe thật. Không thể xác minh điều khiển phần cứng chỉ bằng ứng dụng.
+
+Lưu ý: firmware mẫu ở repository GitHub được tham khảo (`quanhuy38/NQFT`) dùng service UUID và packet điều khiển khác, đồng thời `applyOutputs()` chưa điều khiển phần cứng. Firmware đó không tương thích trực tiếp với giao thức NQFT ở repository này; cần đồng bộ firmware trước khi thử PWM thật.
 
 ## Kiểm tra
 

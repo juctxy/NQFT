@@ -119,7 +119,9 @@ export function BluetoothPicker({
                     <Text numberOfLines={1} style={styles.deviceName}>
                       {nearbyDeviceName(device)}
                     </Text>
-                    <Text style={styles.deviceSignal}>RSSI {device.rssi} dBm</Text>
+                    {typeof device.rssi === 'number' ? (
+                      <Text style={styles.deviceSignal}>RSSI {device.rssi} dBm</Text>
+                    ) : null}
                   </View>
                   <Pressable
                     accessibilityLabel={

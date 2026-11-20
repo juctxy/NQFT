@@ -2,6 +2,8 @@
 
 This is the phone application's proposed contract for compatible ESP32 firmware. No firmware source is present in this repository, so the UUIDs and packet behavior below have not been verified against a physical car.
 
+The web build uses Web Bluetooth with the same GATT UUIDs and frames as the native app. It requires a secure context and a user gesture to open the browser's device chooser. The separate `quanhuy38/NQFT` reference firmware uses a different 4-byte control protocol and does not implement PWM outputs, so it is not compatible with this contract.
+
 ## GATT
 
 | Attribute | UUID | Required properties |

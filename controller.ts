@@ -17,6 +17,23 @@ export interface SpeedPresets {
 
 export type DriveMode = 'standard' | 'omni' | 'mecanum';
 
+export function scaleControllerCanvas(
+  platform: string,
+  windowSize: { width: number; height: number },
+  layoutSize: { width: number; height: number },
+  canvasWidth: number,
+  canvasHeight: number,
+): number {
+  const viewportIsAvailable =
+    Number.isFinite(windowSize.width) &&
+    Number.isFinite(windowSize.height) &&
+    windowSize.width > 0 &&
+    windowSize.height > 0;
+  const { width, height } =
+    platform === 'web' && viewportIsAvailable ? windowSize : layoutSize;
+  return Math.min(width / canvasWidth, height / canvasHeight) * 0.96;
+}
+
 export interface DriveConfig {
   mode: DriveMode;
   vMain: number;

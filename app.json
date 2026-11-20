@@ -18,7 +18,8 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/NQFT"
     },
     "ios": {
       "bundleIdentifier": "com.juctxy.nqftrobotcontroller",
@@ -39,6 +40,8 @@
       ]
     },
     "web": {
+      "bundler": "metro",
+      "output": "static",
       "favicon": "./assets/favicon.png"
     },
     "extra": {

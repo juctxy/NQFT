@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   GestureDetector,
   usePanGesture,
@@ -22,6 +22,7 @@ import {
 import {
   Animated,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -31,7 +32,7 @@ import {
 } from 'react-native';
 import { BluetoothPicker } from './BluetoothPicker';
 import { nearbyDeviceName, type NearbyDevice } from '../bluetooth';
-import { clampJoystick } from '../controller';
+import { clampJoystick, scaleControllerCanvas } from '../controller';
 import type { DriveMode } from '../controller';
 import {
   normalizeJoystick,
@@ -297,10 +298,30 @@ export function ControllerScreen({
     height: windowSize.height,
   });
   const [bluetoothPickerVisible, setBluetoothPickerVisible] = useState(false);
-  const scale = Math.min(
-    availableSize.width / CANVAS_WIDTH,
-    availableSize.height / CANVAS_HEIGHT,
-  ) * 0.96;
+  const [webViewportSize, setWebViewportSize] = useState({
+    width: windowSize.width,
+    height: windowSize.height,
+  });
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const updateViewportSize = () => {
+      setWebViewportSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    updateViewportSize();
+    window.addEventListener('resize', updateViewportSize);
+    return () => {
+      window.removeEventListener('resize', updateViewportSize);
+    };
+  }, []);
+  const viewportSize = Platform.OS === 'web' ? webViewportSize : windowSize;
+  const scale = scaleControllerCanvas(
+    Platform.OS,
+    viewportSize,
+    availableSize,
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT,
+  );
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;

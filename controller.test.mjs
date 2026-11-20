@@ -5,6 +5,7 @@ import {
   clampSpeed,
   determineDirection,
   getMatchingSpeedPreset,
+  scaleControllerCanvas,
 } from './controller.ts';
 import { loadDriveSettings, saveDriveSettings } from './context/driveSettingsStorage.ts';
 import * as controller from './controller.ts';
@@ -54,6 +55,20 @@ test('limits joystick movement to its circular travel boundary', () => {
 
   const diagonal = clampJoystick(100, 100, 50);
   assert.ok(Math.hypot(diagonal.x, diagonal.y) <= 50);
+});
+
+test('uses viewport dimensions for web canvas scale when layout measurement is zero', () => {
+  assert.equal(
+    scaleControllerCanvas('web', { width: 646, height: 382 }, { width: 0, height: 0 }, 840, 380),
+    0.7382857142857143,
+  );
+});
+
+test('falls back to measured layout dimensions before the web viewport is ready', () => {
+  assert.equal(
+    scaleControllerCanvas('web', { width: 0, height: 0 }, { width: 646, height: 382 }, 840, 380),
+    0.7382857142857143,
+  );
 });
 
 test('matches the unique preset shared by both motor speeds', () => {

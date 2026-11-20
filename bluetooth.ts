@@ -3,7 +3,7 @@ import type { Permission } from 'react-native';
 export interface NearbyDevice {
   id: string;
   name?: string;
-  rssi: number;
+  rssi?: number;
 }
 
 export function canLoadNativeBleManager(platform: string, appOwnership: string | null): boolean {
@@ -95,6 +95,27 @@ export function mergeNearbyDevice(
 
 export function nearbyDeviceName(device: NearbyDevice): string {
   return device.name?.trim() || 'Unnamed BLE device';
+}
+
+export function getWebBluetoothRequestError(error: unknown): string | null {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    name === 'NotFoundError' ||
+    name === 'AbortError' ||
+    normalizedMessage.includes('cancelled') ||
+    normalizedMessage.includes('canceled')
+  ) {
+    return null;
+  }
+
+  if (name === 'SecurityError' || name === 'NotAllowedError') {
+    return 'Web Bluetooth requires HTTPS and permission to access nearby Bluetooth devices.';
+  }
+
+  return `Could not open the Bluetooth device chooser: ${message}`;
 }
 
 export function getAndroidBlePermissions(version: number): Permission[] {

@@ -64,8 +64,10 @@ static void logCommand(const ControlCommand& cmd) {
                  cmd.flags    != g_logged.flags;
   uint32_t now = millis();
   if (changed && now - g_lastLogMs >= LOG_INTERVAL_MS) {
-    Serial.printf("[CMD] seq=%3u thr=%4d steer=%4d flags=0x%02X\n",
-                  cmd.seq, cmd.throttle, cmd.steering, cmd.flags);
+    // fn: nút Function đang chọn trên app (F0 = không chọn, F1..F4)
+    Serial.printf("[CMD] seq=%3u thr=%4d steer=%4d flags=0x%02X fn=F%u\n",
+                  cmd.seq, cmd.throttle, cmd.steering, cmd.flags,
+                  (unsigned)((cmd.flags & FUNCTION_MASK) >> FUNCTION_SHIFT));
     g_lastLogMs = now;
     g_logged = cmd;
   }

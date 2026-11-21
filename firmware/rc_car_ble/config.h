@@ -1,7 +1,7 @@
 #pragma once
 
 // ===== Giao thức BLE (đồng bộ với web/src/protocol/constants.ts và docs/protocol.md) =====
-#define PROTOCOL_VERSION      1
+#define PROTOCOL_VERSION      2
 
 #define SERVICE_UUID          "6e3a0001-8f5c-4b7a-9d2e-3c1f0a7b5e10"
 #define CONTROL_CHAR_UUID     "6e3a0002-8f5c-4b7a-9d2e-3c1f0a7b5e10"
@@ -11,6 +11,13 @@
 
 #define CONTROL_PACKET_LEN    4
 #define TELEMETRY_PACKET_LEN  4
+
+// flags: bit 0 đèn, bit 1 còi, bit 2 phanh, bit 3..5 = nút Function (0 = không chọn, 1..4 = F1..F4)
+#define FLAG_LIGHT            0x01
+#define FLAG_HORN             0x02
+#define FLAG_BRAKE            0x04
+#define FUNCTION_SHIFT        3
+#define FUNCTION_MASK         0x38
 
 // ===== Thời gian (ms) =====
 #define FAILSAFE_TIMEOUT_MS   500

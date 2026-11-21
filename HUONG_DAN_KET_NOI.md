@@ -196,8 +196,8 @@ App được host miễn phí tại:
 ### 10.1. Android (Chrome)
 1. Bật **Bluetooth** trên điện thoại.
 2. Mở **Chrome** → vào link app.
-3. **Cài app lên màn hình chính (khuyến nghị):** bấm nút **📲 Cài app** ở đầu trang (hoặc menu **⋮** → **Cài đặt ứng dụng / Thêm vào màn hình chính**) → **Cài đặt**. Từ lần sau mở app từ icon "RC Car" như app bình thường, chạy được cả khi không có mạng.
-4. Không dùng Firefox, Opera Mini hay trình duyệt Facebook/Zalo (mở link trong Zalo/Messenger sẽ không có Bluetooth) — trang sẽ hiện nút **Mở bằng Chrome**.
+3. **Cài app lên màn hình chính (khuyến nghị):** bấm **Cài đặt** khi Chrome hiện lời mời cài app, hoặc menu **⋮** → **Cài đặt ứng dụng / Thêm vào màn hình chính** → **Cài đặt**. Từ lần sau mở app từ icon "RC Car" như app bình thường, chạy được cả khi không có mạng.
+4. Không dùng Firefox, Opera Mini hay trình duyệt Facebook/Zalo (mở link trong Zalo/Messenger sẽ không có Bluetooth) — bấm **BLUETOOTH** sẽ hiện hộp thoại hỏi **mở bằng Chrome**.
 5. **Hoặc cài bằng file APK:** tải tại <https://github.com/quanhuy38/NQFT/releases/latest> — cách tạo và cài APK: [`docs/HUONG_DAN_APK.md`](docs/HUONG_DAN_APK.md).
 
 ### 10.2. iPhone / iPad (Bluefy)
@@ -221,25 +221,21 @@ Safari và mọi trình duyệt khác trên iOS **không hỗ trợ Web Bluetoot
 ## 11. Kết nối điện thoại với ESP32
 
 1. Đảm bảo: ESP32 đang chạy (Serial Monitor thấy `Advertising as RC-Car-XXXX`), **nRF Connect đã ngắt kết nối**, Bluetooth điện thoại đang bật.
-2. Mở app → thấy trang **"RC Car — Kiểm tra kết nối"**, trạng thái **Chưa kết nối**.
-3. Bấm **Kết nối**.
+2. Mở app (nên xoay ngang điện thoại) → thanh trên có nút **BLUETOOTH** (chưa kết nối).
+3. Bấm **BLUETOOTH**.
 4. Điện thoại hiện hộp thoại danh sách thiết bị Bluetooth:
    - **Android:** lần đầu Chrome có thể hỏi quyền **"Thiết bị ở gần"** (Android 12+) hoặc **"Vị trí"** (Android 6–11) → chọn **Cho phép**. Trên Android 6–11, **phải bật Vị trí (GPS)** của điện thoại thì mới quét được Bluetooth.
 5. Chọn **RC-Car-XXXX** → bấm **Ghép nối / Kết nối (Pair / Connect)**.
    > Không cần mã PIN. Nếu điện thoại hỏi "ghép nối" trong Cài đặt Bluetooth của hệ thống — **không cần** làm ở đó; chỉ chọn trong hộp thoại của app.
-6. Trạng thái chuyển **Đang kết nối… → Đã kết nối** (màu xanh), hiện tên thiết bị.
+6. Nút chuyển thành **CONNECTED** (nền xanh). Nếu có lỗi, trình duyệt hiện hộp thoại báo lỗi.
    Serial Monitor hiện `[BLE] Connected: …` rồi `[SAFE] Commands resumed`.
-7. **Thử gửi lệnh:** kéo thanh **Ga** sang phải → Serial Monitor hiện:
+7. **Thử gửi lệnh (MODE 1):** giữ nút **▲** → Serial Monitor hiện (Motor 1 = 128 → ga 50):
    ```
-   [CMD] seq= 87 thr=  64 steer=   0 flags=0x00
+   [CMD] seq= 87 thr=  50 steer=   0 flags=0x00 fn=F0
    ```
-   Thả tay → thanh tự về 0 → `thr=   0`.
-   Kéo thanh **Lái** → `steer` thay đổi tương ứng (âm = trái, dương = phải).
-8. **Kiểm tra dữ liệu từ xe:** mục **Telemetry** cập nhật mỗi 0,5 giây:
-   - *Pin:* "chưa có cảm biến" (bình thường — chưa lắp mạch đo pin).
-   - *Failsafe:* "bình thường".
-   - *Gói cuối xe nhận:* số `seq` tăng liên tục.
-9. Dòng `seq … · đã gửi … · bỏ qua …` dưới thanh trượt: **đã gửi** tăng ~30/giây là đúng. **Bỏ qua** tăng ít là bình thường (app bỏ gói khi gói trước chưa gửi xong).
+   Thả tay → `thr=   0`. Giữ **◀ / ▶** → `steer` âm/dương. Giữ **▲ + ◀** cùng lúc → đi chéo.
+   Kéo **MOTOR 1** lên 255 rồi giữ ▲ → `thr= 100`. Bấm **F2** → `flags=0x10 fn=F2`; bấm lại F2 → `fn=F0`.
+8. **MODE 2:** kéo joystick → `thr`/`steer` thay đổi theo hướng kéo; thả tay → về 0.
 
 🎉 **Đến đây điện thoại đã kết nối và điều khiển được ESP32.**
 
@@ -250,9 +246,9 @@ Safari và mọi trình duyệt khác trên iOS **không hỗ trợ Web Bluetoot
 | Thử | Kết quả đúng |
 |---|---|
 | Đang kết nối, **chuyển app xuống nền** (về màn hình chính) | Serial Monitor hiện `[SAFE] Stop: command timeout` trong ≤ 0,5 s. Mở lại app → `Commands resumed` |
-| **Bấm nút EN/RST** trên ESP32 (hoặc rút nguồn rồi cắm lại) | App chuyển **Đang kết nối lại…** → tự **Đã kết nối** sau vài giây (thử tối đa 5 lần) |
-| Rút nguồn ESP32 **lâu hơn ~8 giây** | App báo "Mất kết nối, không thể kết nối lại" → cắm lại → bấm **Kết nối** |
-| Bấm **Ngắt kết nối** trong app | Serial Monitor: `Disconnected`, ESP32 phát lại Bluetooth. App **không** tự kết nối lại |
+| **Bấm nút EN/RST** trên ESP32 (hoặc rút nguồn rồi cắm lại) | Nút tạm về **BLUETOOTH** → tự **CONNECTED** lại sau vài giây (thử tối đa 5 lần) |
+| Rút nguồn ESP32 **lâu hơn ~8 giây** | App báo "Mất kết nối, không thể kết nối lại" → cắm lại → bấm **BLUETOOTH** |
+| Bấm **CONNECTED** (ngắt kết nối) trong app | Serial Monitor: `Disconnected`, ESP32 phát lại Bluetooth. App **không** tự kết nối lại |
 | Đi xa ra khỏi tầm Bluetooth (~10–30 m) | ESP32 dừng (failsafe), app báo kết nối lại |
 
 ---
@@ -277,11 +273,12 @@ Safari và mọi trình duyệt khác trên iOS **không hỗ trợ Web Bluetoot
 |---|---|
 | App báo **"Trình duyệt này không hỗ trợ Web Bluetooth"** | Android: mở bằng **Chrome** (không mở trong Zalo/Facebook/Messenger). iPhone: dùng **Bluefy** |
 | Hộp thoại chọn thiết bị **trống / không thấy RC-Car** | Kiểm tra ESP32 có in `Advertising`; **ngắt nRF Connect**; bật Bluetooth; Android 6–11: **bật Vị trí (GPS)**; tắt bật lại Bluetooth điện thoại |
-| Bấm **Kết nối** không hiện gì | Kiểm tra quyền: **Cài đặt → Ứng dụng → Chrome → Quyền** → bật **Thiết bị ở gần** (hoặc **Vị trí**) |
+| Đã ghép đôi (pair) `RC-Car-XXXX` trong **Cài đặt → Bluetooth** của điện thoại nhưng app không điều khiển được | Xe dùng **BLE**, không phải Bluetooth thường (Classic), nên **không cần pair** trong Cài đặt. Vào Cài đặt Bluetooth chọn **Hủy ghép đôi / Quên thiết bị**, rồi kết nối bằng nút trong app |
+| Bấm **BLUETOOTH** không hiện gì | Kiểm tra quyền: **Cài đặt → Ứng dụng → Chrome → Quyền** → bật **Thiết bị ở gần** (hoặc **Vị trí**) |
 | `NetworkError: Connection failed` / kết nối rồi rớt ngay | Bấm EN/RST trên ESP32 rồi thử lại; để điện thoại gần ESP32; tắt bật Bluetooth điện thoại |
 | `SecurityError` / `requestDevice … not allowed` | Trang phải mở qua **https://** (link GitHub Pages đã là https) |
 | Link GitHub Pages báo **404** | Chưa bật GitHub Pages hoặc workflow chưa chạy xong (mục 10.3) |
-| Đã kết nối nhưng Serial Monitor không có `[CMD]` | Kéo thanh trượt (lệnh chỉ in khi giá trị thay đổi); kiểm tra firmware và app cùng **UUID** (`config.h` và `web/src/protocol/constants.ts`) |
+| Đã kết nối nhưng Serial Monitor không có `[CMD]` | Giữ một nút hướng (lệnh chỉ in khi giá trị thay đổi); kiểm tra **MOTOR 1/2** không ở 0; kiểm tra firmware và app cùng **UUID** (`config.h` và `web/src/protocol/constants.ts`) |
 | App cũ không cập nhật sau khi deploy bản mới | Đóng hẳn app và mở lại (app tự cập nhật ở lần mở kế tiếp) |
 
 ### Công cụ chẩn đoán nâng cao (Android)

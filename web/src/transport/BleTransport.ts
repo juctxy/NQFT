@@ -10,6 +10,11 @@ import type { ConnectionState, Transport, TransportErrorCode, TransportStatus } 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY_MS = 500;
 
+export interface SelectedDevice {
+  id: string;
+  name: string | null;
+}
+
 export function isWebBluetoothSupported(): boolean {
   return typeof navigator !== 'undefined' && 'bluetooth' in navigator && !!navigator.bluetooth;
 }
@@ -27,21 +32,29 @@ export class BleTransport implements Transport {
   private userDisconnect = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Chọn thiết bị + kết nối luôn. */
   async connect(): Promise<void> {
+    if (await this.requestDevice()) await this.connectSelected();
+  }
+
+  /**
+   * Bước 1: mở hộp thoại chọn thiết bị của trình duyệt (phải gọi trực tiếp từ thao tác người dùng).
+   * Trả về thiết bị đã chọn, hoặc null nếu bấm Hủy / lỗi (lỗi nằm trong status.error).
+   */
+  async requestDevice(): Promise<SelectedDevice | null> {
     if (!isWebBluetoothSupported()) {
       this.setStatus({
         state: 'disconnected',
         error: 'Trình duyệt này không hỗ trợ Bluetooth. Hãy mở bằng Chrome (Android) hoặc Bluefy (iPhone).',
         errorCode: 'unsupported',
       });
-      return;
+      return null;
     }
-    if (this.status.state !== 'disconnected') return;
+    if (this.status.state !== 'disconnected') return null;
     this.setStatus({ error: null, errorCode: null });
 
     let device: BluetoothDevice;
     try {
-      // Phải gọi trực tiếp từ thao tác người dùng (click).
       device = await navigator.bluetooth.requestDevice({
         filters: [{ services: [SERVICE_UUID] }, { namePrefix: DEVICE_NAME_PREFIX }],
         optionalServices: [SERVICE_UUID],
@@ -50,15 +63,21 @@ export class BleTransport implements Transport {
       const failure = classifyRequestError(e);
       this.setStatus({ state: 'disconnected', ...failure });
       if (failure.error) console.warn('[BLE] requestDevice failed', e);
-      return;
+      return null;
     }
 
     this.detachDevice();
     this.device = device;
-    this.userDisconnect = false;
     device.addEventListener('gattserverdisconnected', this.handleDisconnected);
-    this.setStatus({ deviceName: device.name ?? 'Không tên' });
+    this.setStatus({ deviceName: device.name ?? null });
+    return { id: device.id, name: device.name ?? null };
+  }
 
+  /** Bước 2: kết nối GATT tới thiết bị đã chọn ở requestDevice(). */
+  async connectSelected(): Promise<void> {
+    const device = this.device;
+    if (!device || this.status.state !== 'disconnected') return;
+    this.userDisconnect = false;
     try {
       await this.openGatt('connecting');
     } catch (e) {

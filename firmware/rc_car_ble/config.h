@@ -12,12 +12,13 @@
 #define CONTROL_PACKET_LEN    4
 #define TELEMETRY_PACKET_LEN  4
 
-// flags: bit 0 đèn, bit 1 còi, bit 2 phanh, bit 3..5 = nút Function (0 = không chọn, 1..4 = F1..F4)
+// flags: bit 0 đèn, bit 1 còi, bit 2 phanh,
+// bit 3..5 = nút hành động đang giữ: 0 = không, 1..4 = FUNC 1..4, 5 = CẢN, 6 = SÚT
 #define FLAG_LIGHT            0x01
 #define FLAG_HORN             0x02
 #define FLAG_BRAKE            0x04
-#define FUNCTION_SHIFT        3
-#define FUNCTION_MASK         0x38
+#define ACTION_SHIFT          3
+#define ACTION_MASK           0x38
 
 // ===== Thời gian (ms) =====
 #define FAILSAFE_TIMEOUT_MS   500

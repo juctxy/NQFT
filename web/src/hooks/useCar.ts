@@ -1,5 +1,6 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ControlLoop } from '../control/ControlLoop';
+import type { Telemetry } from '../protocol/packet';
 import { BleTransport } from '../transport/BleTransport';
 import type { Transport } from '../transport/Transport';
 
@@ -13,18 +14,28 @@ export function useCar() {
     () => transport.getStatus(),
   );
 
+  const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
+
   useEffect(() => {
     controlLoop.start();
-    return () => controlLoop.stop();
+    const off = transport.onTelemetry(setTelemetry);
+    return () => {
+      off();
+      controlLoop.stop();
+    };
   }, []);
 
   useEffect(() => {
     if (status.state !== 'connected') controlLoop.resetInput();
+    if (status.state === 'disconnected') setTelemetry(null);
   }, [status.state]);
 
   return {
     status,
+    telemetry,
     connect: () => transport.connect(),
+    requestDevice: () => transport.requestDevice(),
+    connectSelected: () => transport.connectSelected(),
     disconnect: () => transport.disconnect(),
     controlLoop,
   };

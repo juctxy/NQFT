@@ -5,7 +5,7 @@ export interface ControlInput {
   throttle: number;
   /** -100..100: âm = trái, dương = phải */
   steering: number;
-  /** bitmask ControlFlag */
+  /** bitmask ButtonBit: nút đang giữ (bit 0..5) */
   flags: number;
 }
 

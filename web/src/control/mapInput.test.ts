@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultDriveProfile, setDriveWheelType } from '../drive/driveModel';
-import { ActionCode } from '../protocol/constants';
-import { mapDrive, withAction, type DriveInput } from './mapInput';
+import { ButtonBit } from '../protocol/constants';
+import { mapDrive, type DriveInput } from './mapInput';
 
 const standard = createDefaultDriveProfile('a', 'A'); // Vừa: 190/190/190, maxLimit 255
 const omni = setDriveWheelType(standard, 'omni');
-const idle: DriveInput = { joystick: { x: 0, y: 0 }, rotate: 0, action: 0 };
+const idle: DriveInput = { joystick: { x: 0, y: 0 }, rotate: 0, buttons: 0 };
 
 describe('mapDrive', () => {
   it('đứng yên khi không chạm', () => {
@@ -34,15 +34,14 @@ describe('mapDrive', () => {
     expect(mapDrive(limited, 'fast', { ...idle, joystick: { x: 1, y: 0 }, rotate: 1 }).steering).toBe(50);
   });
 
-  it('nút SÚT → mã 6 ở bit 3..5 (flags 0x30)', () => {
-    expect(mapDrive(standard, 'medium', { ...idle, action: ActionCode.Kick }).flags).toBe(0x30);
+  it('mỗi nút 1 bit: SÚT → 0x20, CẢN + FUNC 1 cùng lúc → 0x11', () => {
+    expect(mapDrive(standard, 'medium', { ...idle, buttons: ButtonBit.Kick }).flags).toBe(0x20);
+    expect(mapDrive(standard, 'medium', { ...idle, buttons: ButtonBit.Block | ButtonBit.Func1 }).flags).toBe(0x11);
   });
-});
 
-describe('withAction', () => {
-  it('giữ các bit khác và bỏ giá trị không hợp lệ', () => {
-    expect(withAction(0x07, 4)).toBe(0x27);
-    expect(withAction(0x3f, 0)).toBe(0x07);
-    expect(withAction(0, 9)).toBe(0);
+  it('đủ 6 nút → 0x3F; bit 6..7 luôn bị xóa', () => {
+    const all = Object.values(ButtonBit).reduce((a, b) => a | b, 0);
+    expect(mapDrive(standard, 'medium', { ...idle, buttons: all }).flags).toBe(0x3f);
+    expect(mapDrive(standard, 'medium', { ...idle, buttons: 0xff }).flags).toBe(0x3f);
   });
 });

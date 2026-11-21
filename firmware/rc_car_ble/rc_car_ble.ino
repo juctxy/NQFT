@@ -58,10 +58,48 @@ static ControlCommand unpackCommand(uint32_t p) {
 static ControlCommand g_logged = STOP_COMMAND;  // lệnh in ra Serial gần nhất
 static uint32_t g_lastLogMs = 0;
 
-// Tên nút hành động trong bit 3..5 của flags (để log).
-static const char* actionName(uint8_t flags) {
-  static const char* const NAMES[] = {"-", "FUNC1", "FUNC2", "FUNC3", "FUNC4", "CAN", "SUT", "?"};
-  return NAMES[(flags & ACTION_MASK) >> ACTION_SHIFT];
+// ---------- Nút (bitmask trong flags) ----------
+static const char* const BUTTON_NAMES[BUTTON_COUNT] = {"F1", "F2", "F3", "F4", "CAN", "SUT"};
+static uint8_t g_buttons = 0;  // trạng thái nút ở lần xử lý trước (để phát hiện vừa nhấn / vừa thả)
+
+// Ghi tên các nút có bit = 1 vào buf, ví dụ "CAN+F1"; không có nút -> "-".
+static const char* buttonList(uint8_t mask, char* buf, size_t len) {
+  size_t n = 0;
+  buf[0] = '\0';
+  for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
+    if (!(mask & (1u << i))) continue;
+    n += snprintf(buf + n, n < len ? len - n : 0, "%s%s", n ? "+" : "", BUTTON_NAMES[i]);
+  }
+  return n ? buf : "-";
+}
+
+// Gọi một lần khi nút vừa được nhấn (sườn lên). Dùng cho hành động chạy 1 lần như SÚT.
+static void onButtonPressed(uint8_t bit) {
+  // TODO: kích hoạt cơ cấu theo nút, ví dụ BTN_KICK -> đẩy cần sút 1 lần.
+  (void)bit;
+}
+
+// Gọi một lần khi nút vừa được thả (sườn xuống).
+static void onButtonReleased(uint8_t bit) {
+  // TODO: ví dụ BTN_BLOCK -> thu cần cản về.
+  (void)bit;
+}
+
+static void updateButtons(uint8_t mask) {
+  mask &= BUTTON_MASK;
+  uint8_t pressed  = mask & ~g_buttons;  // 0 -> 1
+  uint8_t released = g_buttons & ~mask;  // 1 -> 0
+  if (pressed || released) {
+    char a[32], b[32];
+    Serial.printf("[BTN] down=%s up=%s\n", pressed ? buttonList(pressed, a, sizeof a) : "-",
+                  released ? buttonList(released, b, sizeof b) : "-");
+  }
+  for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
+    uint8_t bit = 1u << i;
+    if (pressed & bit) onButtonPressed(bit);
+    if (released & bit) onButtonReleased(bit);
+  }
+  g_buttons = mask;
 }
 
 static void logCommand(const ControlCommand& cmd) {
@@ -70,21 +108,26 @@ static void logCommand(const ControlCommand& cmd) {
                  cmd.flags    != g_logged.flags;
   uint32_t now = millis();
   if (changed && now - g_lastLogMs >= LOG_INTERVAL_MS) {
-    Serial.printf("[CMD] seq=%3u thr=%4d steer=%4d flags=0x%02X act=%s\n",
-                  cmd.seq, cmd.throttle, cmd.steering, cmd.flags, actionName(cmd.flags));
+    char names[32];
+    Serial.printf("[CMD] seq=%3u thr=%4d steer=%4d flags=0x%02X btn=%s\n",
+                  cmd.seq, cmd.throttle, cmd.steering, cmd.flags,
+                  buttonList(cmd.flags & BUTTON_MASK, names, sizeof names));
     g_lastLogMs = now;
     g_logged = cmd;
   }
 }
 
 static void applyOutputs(const ControlCommand& cmd) {
-  // TODO: điều khiển động cơ / servo / đèn / còi theo cmd tại đây.
+  // TODO: điều khiển động cơ / servo theo cmd.throttle, cmd.steering tại đây.
+  // Nút đang giữ: kiểm tra (cmd.flags & BTN_xxx); sự kiện nhấn/thả xử lý trong updateButtons().
+  updateButtons(cmd.flags);
   logCommand(cmd);
 }
 
 static void stopOutputs(const char* reason) {
   // TODO: tắt động cơ, servo về giữa ngay lập tức.
   Serial.printf("[SAFE] Stop: %s\n", reason);
+  updateButtons(0);  // failsafe = thả mọi nút
   g_logged = STOP_COMMAND;
 }
 

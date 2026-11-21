@@ -5,7 +5,7 @@ import { clampJoystick, normalizeJoystick, type Vec } from '../drive/driveModel'
 import { useController } from '../drive/ControllerContext';
 import { nearbyDeviceName, useBluetooth } from '../hooks/BluetoothContext';
 import { useDriveInput } from '../hooks/useDriveInput';
-import { ActionCode } from '../protocol/constants';
+import { ButtonBit } from '../protocol/constants';
 import { Pressable, Text, View, shadow, sx, type Style } from '../ui/rn';
 import { BluetoothPicker } from './BluetoothPicker';
 import { SpeedPresetSelector } from './SpeedPresetSelector';
@@ -145,7 +145,7 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
   }, [bt]);
 
   const quick = driveSettings.profiles.slice(0, 2);
-  const action = (code: number) => ({ onDown: () => drive.pressAction(code), onUp: () => drive.releaseAction(code) });
+  const action = (code: number) => ({ onDown: () => drive.pressButton(code), onUp: () => drive.releaseButton(code) });
 
   return (
     <View style={s.root}>
@@ -217,10 +217,10 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
           </View>
 
           <View style={s.centerButtons}>
-            <HoldButton label="FUNC 1" style={s.functionButton} pressedStyle={s.pressedButton} {...action(ActionCode.Func1)}>
+            <HoldButton label="FUNC 1" style={s.functionButton} pressedStyle={s.pressedButton} {...action(ButtonBit.Func1)}>
               <Text style={s.functionText}>FUNC 1</Text>
             </HoldButton>
-            <HoldButton label="FUNC 2" style={s.functionButton} pressedStyle={s.pressedButton} {...action(ActionCode.Func2)}>
+            <HoldButton label="FUNC 2" style={s.functionButton} pressedStyle={s.pressedButton} {...action(ButtonBit.Func2)}>
               <Text style={s.functionText}>FUNC 2</Text>
             </HoldButton>
             {profile.wheelType !== 'standard' ? (
@@ -237,21 +237,17 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
 
           <View style={s.gripCircle}>
             <View style={s.actionPad}>
-              <HoldButton label="Cản banh" style={sx(s.actionButton, s.actionTop)} pressedStyle={s.pressedButton} {...action(ActionCode.Block)}>
+              <HoldButton label="Cản banh" style={sx(s.actionButton, s.actionTop)} pressedStyle={s.pressedButton} {...action(ButtonBit.Block)}>
                 <Triangle color="#fff" size={22} strokeWidth={2.5} />
-                <Text style={s.actionLabel}>CẢN</Text>
               </HoldButton>
-              <HoldButton label="Sút banh" style={sx(s.actionButton, s.actionBottom)} pressedStyle={s.pressedButton} {...action(ActionCode.Kick)}>
+              <HoldButton label="Sút banh" style={sx(s.actionButton, s.actionBottom)} pressedStyle={s.pressedButton} {...action(ButtonBit.Kick)}>
                 <X color="#fff" size={24} strokeWidth={2.5} />
-                <Text style={s.actionLabel}>SÚT</Text>
               </HoldButton>
-              <HoldButton label="Chức năng 3" style={sx(s.actionButton, s.actionLeft)} pressedStyle={s.pressedButton} {...action(ActionCode.Func3)}>
+              <HoldButton label="Chức năng 3" style={sx(s.actionButton, s.actionLeft)} pressedStyle={s.pressedButton} {...action(ButtonBit.Func3)}>
                 <Square color="#fff" size={22} strokeWidth={2.2} />
-                <Text style={s.actionLabel}>FUNC 3</Text>
               </HoldButton>
-              <HoldButton label="Chức năng 4" style={sx(s.actionButton, s.actionRight)} pressedStyle={s.pressedButton} {...action(ActionCode.Func4)}>
+              <HoldButton label="Chức năng 4" style={sx(s.actionButton, s.actionRight)} pressedStyle={s.pressedButton} {...action(ButtonBit.Func4)}>
                 <Circle color="#fff" size={22} strokeWidth={2.2} />
-                <Text style={s.actionLabel}>FUNC 4</Text>
               </HoldButton>
             </View>
           </View>
@@ -416,6 +412,5 @@ const s: Record<string, Style> = {
   actionBottom: { bottom: 0, left: 75 },
   actionLeft: { left: 0, top: 75 },
   actionRight: { right: 0, top: 75 },
-  actionLabel: { color: '#fff', fontSize: 10, fontWeight: 700, marginTop: 2 },
   pressedButton: { backgroundColor: '#10b981', borderColor: '#d1fae5', opacity: 0.95, transform: 'scale(0.94)' },
 };

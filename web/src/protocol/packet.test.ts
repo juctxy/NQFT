@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeTelemetry, encodeControl } from './packet';
-import { ControlFlag } from './constants';
+import { ButtonBit } from './constants';
 
 describe('encodeControl', () => {
   it('khớp ví dụ trong docs/protocol.md', () => {
@@ -17,7 +17,7 @@ describe('encodeControl', () => {
   });
 
   it('seq quay vòng 0..255 và giữ cờ', () => {
-    const p = encodeControl(257, { throttle: 0, steering: 0, flags: ControlFlag.Light | ControlFlag.Brake });
+    const p = encodeControl(257, { throttle: 0, steering: 0, flags: ButtonBit.Func1 | ButtonBit.Func3 });
     expect(p[0]).toBe(1);
     expect(p[3]).toBe(0b101);
   });

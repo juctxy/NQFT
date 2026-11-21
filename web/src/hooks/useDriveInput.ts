@@ -2,19 +2,19 @@ import { useCallback, useEffect, useRef } from 'react';
 import { mapDrive, type DriveInput } from '../control/mapInput';
 import type { ControlLoop } from '../control/ControlLoop';
 import type { DriveProfile, SpeedLevel, Vec } from '../drive/driveModel';
-import { ActionCode } from '../protocol/constants';
 
-/** Giữ mã nút hành động tối thiểu chừng này để chạm nhanh vẫn tới được xe (≥ 4 gói ở 30 Hz). */
-const MIN_ACTION_MS = 150;
+/** Mỗi nút được giữ tối thiểu chừng này để chạm nhanh vẫn tới được xe (≥ 4 gói ở 30 Hz). */
+const MIN_PRESS_MS = 150;
 
 /**
- * Gom joystick / nút xoay / nút hành động thành lệnh và đẩy vào ControlLoop.
+ * Gom joystick / nút xoay / các nút đang giữ thành lệnh và đẩy vào ControlLoop.
+ * Các nút là bitmask: giữ nhiều nút cùng lúc thì nhiều bit cùng bằng 1.
  * Dùng ref nên kéo joystick không làm render lại màn hình.
  */
 export function useDriveInput(controlLoop: ControlLoop, profile: DriveProfile, level: SpeedLevel, connectedKey: string) {
-  const input = useRef<DriveInput>({ joystick: { x: 0, y: 0 }, rotate: 0, action: ActionCode.None });
-  const actionStartedAt = useRef(0);
-  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const input = useRef<DriveInput>({ joystick: { x: 0, y: 0 }, rotate: 0, buttons: 0 });
+  const pressedAt = useRef(new Map<number, number>());
+  const releaseTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const config = useRef({ profile, level });
   config.current = { profile, level };
 
@@ -39,36 +39,47 @@ export function useDriveInput(controlLoop: ControlLoop, profile: DriveProfile, l
     },
     [push],
   );
-  const pressAction = useCallback(
-    (code: number) => {
-      if (releaseTimer.current) clearTimeout(releaseTimer.current);
-      releaseTimer.current = null;
-      actionStartedAt.current = Date.now();
-      input.current = { ...input.current, action: code };
+
+  const setBit = useCallback(
+    (bit: number, on: boolean) => {
+      const buttons = on ? input.current.buttons | bit : input.current.buttons & ~bit;
+      input.current = { ...input.current, buttons };
       push();
     },
     [push],
   );
-  const releaseAction = useCallback(
-    (code: number) => {
-      if (input.current.action !== code) return;
+
+  /** Bật bit của nút (các nút khác giữ nguyên). */
+  const pressButton = useCallback(
+    (bit: number) => {
+      const t = releaseTimers.current.get(bit);
+      if (t) clearTimeout(t);
+      releaseTimers.current.delete(bit);
+      pressedAt.current.set(bit, Date.now());
+      setBit(bit, true);
+    },
+    [setBit],
+  );
+
+  /** Tắt bit của nút, nhưng không sớm hơn MIN_PRESS_MS kể từ lúc nhấn. */
+  const releaseButton = useCallback(
+    (bit: number) => {
+      const left = MIN_PRESS_MS - (Date.now() - (pressedAt.current.get(bit) ?? 0));
       const clear = () => {
-        releaseTimer.current = null;
-        if (input.current.action !== code) return;
-        input.current = { ...input.current, action: ActionCode.None };
-        push();
+        releaseTimers.current.delete(bit);
+        setBit(bit, false);
       };
-      const left = MIN_ACTION_MS - (Date.now() - actionStartedAt.current);
-      if (left > 0) releaseTimer.current = setTimeout(clear, left);
+      if (left > 0) releaseTimers.current.set(bit, setTimeout(clear, left));
       else clear();
     },
-    [push],
+    [setBit],
   );
-  /** Dừng ngay: thả joystick, nút xoay, nút hành động. */
+
+  /** Dừng ngay: thả joystick, nút xoay và mọi nút. */
   const stop = useCallback(() => {
-    if (releaseTimer.current) clearTimeout(releaseTimer.current);
-    releaseTimer.current = null;
-    input.current = { joystick: { x: 0, y: 0 }, rotate: 0, action: ActionCode.None };
+    releaseTimers.current.forEach(clearTimeout);
+    releaseTimers.current.clear();
+    input.current = { joystick: { x: 0, y: 0 }, rotate: 0, buttons: 0 };
     push();
   }, [push]);
 
@@ -82,5 +93,5 @@ export function useDriveInput(controlLoop: ControlLoop, profile: DriveProfile, l
     };
   }, [stop]);
 
-  return { setJoystick, setRotate, pressAction, releaseAction, stop };
+  return { setJoystick, setRotate, pressButton, releaseButton, stop };
 }

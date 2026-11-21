@@ -1,7 +1,7 @@
 #pragma once
 
 // ===== Giao thức BLE (đồng bộ với web/src/protocol/constants.ts và docs/protocol.md) =====
-#define PROTOCOL_VERSION      2
+#define PROTOCOL_VERSION      3
 
 #define SERVICE_UUID          "6e3a0001-8f5c-4b7a-9d2e-3c1f0a7b5e10"
 #define CONTROL_CHAR_UUID     "6e3a0002-8f5c-4b7a-9d2e-3c1f0a7b5e10"
@@ -12,13 +12,15 @@
 #define CONTROL_PACKET_LEN    4
 #define TELEMETRY_PACKET_LEN  4
 
-// flags: bit 0 đèn, bit 1 còi, bit 2 phanh,
-// bit 3..5 = nút hành động đang giữ: 0 = không, 1..4 = FUNC 1..4, 5 = CẢN, 6 = SÚT
-#define FLAG_LIGHT            0x01
-#define FLAG_HORN             0x02
-#define FLAG_BRAKE            0x04
-#define ACTION_SHIFT          3
-#define ACTION_MASK           0x38
+// flags (v3): mỗi bit = 1 nút đang giữ -> gửi được nhiều nút cùng lúc. Bit 6..7 dự trữ.
+#define BTN_FUNC1             0x01  // bit 0
+#define BTN_FUNC2             0x02  // bit 1
+#define BTN_FUNC3             0x04  // bit 2
+#define BTN_FUNC4             0x08  // bit 3
+#define BTN_BLOCK             0x10  // bit 4 — CẢN
+#define BTN_KICK              0x20  // bit 5 — SÚT
+#define BUTTON_MASK           0x3F
+#define BUTTON_COUNT          6
 
 // ===== Thời gian (ms) =====
 #define FAILSAFE_TIMEOUT_MS   500

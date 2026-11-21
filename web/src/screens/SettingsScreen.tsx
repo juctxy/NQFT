@@ -3,7 +3,7 @@
 // firmware hiện tại chưa hỗ trợ; mọi thay đổi hồ sơ vẫn lưu trên điện thoại và mức tốc độ/giới hạn
 // được dùng ngay khi tính lệnh lái.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { ArrowLeftCircle, RotateCcw, Save, Square, Triangle } from 'lucide-react';
+import { ArrowLeftCircle, Download, RotateCcw, Save, Square, Triangle } from 'lucide-react';
 import {
   clampJoystick,
   mixDrive,
@@ -27,6 +27,8 @@ import {
 import { useController } from '../drive/ControllerContext';
 import { useBluetooth } from '../hooks/BluetoothContext';
 import { useDriveInput } from '../hooks/useDriveInput';
+import { useInstallApp } from '../hooks/useInstallApp';
+import { InstallAppSheet } from './InstallAppSheet';
 import { Slider, Switch } from '../ui/controls';
 import { Pressable, Text, View, type Style } from '../ui/rn';
 
@@ -609,6 +611,8 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
   const level = c.driveSettings.activeLevel;
   const drive = useDriveInput(bt.controlLoop, profile, level, bt.connectionKey);
   const [tab, setTab] = useState<Tab>('speed');
+  const [installVisible, setInstallVisible] = useState(false);
+  const { standalone } = useInstallApp();
   const connected = Boolean(bt.connectedDevice);
   const ready = c.driveSettingsReady;
   const battery = bt.batteryVoltageMv === null ? 'Pin: —' : `Pin: ${(bt.batteryVoltageMv / 1000).toFixed(2)} V`;
@@ -621,6 +625,12 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           <Text style={s.connectionText}>{connected ? 'Đã kết nối với xe' : 'Chưa kết nối'}</Text>
           <Text style={s.batteryText}>{battery}</Text>
         </View>
+        {standalone ? null : (
+          <Pressable label="Tải app về máy (Android, iPhone)" onPress={() => setInstallVisible(true)} style={s.installButton}>
+            <Download color="#f47518" size={16} />
+            <Text style={s.installButtonText}>TẢI APP</Text>
+          </Pressable>
+        )}
         <Pressable label="Dừng xe ngay" onPress={drive.stop} style={s.stopButton}>
           <Square color="#fff" size={14} fill="#fff" />
           <Text style={s.stopButtonText}>DỪNG</Text>
@@ -702,6 +712,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           </Pressable>
         </View>
       </View>
+      {installVisible ? <InstallAppSheet onClose={() => setInstallVisible(false)} /> : null}
     </View>
   );
 }
@@ -715,6 +726,8 @@ const s: Record<string, Style> = {
   connectedDot: { backgroundColor: '#22c55e' },
   connectionText: { color: '#fff', fontSize: 12, fontWeight: 700 },
   batteryText: { color: '#cbd5e1', fontSize: 11, marginLeft: 8 },
+  installButton: { alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, flexDirection: 'row', gap: 5, justifyContent: 'center', minHeight: 38, paddingLeft: 10, paddingRight: 10 },
+  installButtonText: { color: '#06324d', fontSize: 10, fontWeight: 800 },
   stopButton: { alignItems: 'center', backgroundColor: '#dc2626', borderRadius: 8, flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: 38, minWidth: 76, paddingLeft: 10, paddingRight: 10 },
   stopButtonText: { color: '#fff', fontSize: 12, fontWeight: 900 },
   closeButton: { alignItems: 'center', backgroundColor: '#f47518', borderRadius: 8, flexDirection: 'row', gap: 5, justifyContent: 'center', minHeight: 38, paddingLeft: 10, paddingRight: 10 },

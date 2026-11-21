@@ -4,15 +4,13 @@ import type { Transport } from '../transport/Transport';
 
 /**
  * Gửi lệnh điều khiển liên tục 30 Hz khi đã kết nối (kiêm heartbeat cho failsafe).
- * Input được ghi vào qua setInput() từ bất kỳ nguồn nào (thanh trượt, joystick, gamepad...)
+ * Input được ghi vào qua setInput() từ bất kỳ nguồn nào (nút hướng, joystick, gamepad...)
  * mà không gây re-render React.
  */
 export class ControlLoop {
   private input: ControlInput = { ...NEUTRAL_INPUT };
   private seq = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
-  private sentCount = 0;
-  private skippedCount = 0;
 
   constructor(private readonly transport: Transport) {}
 
@@ -36,19 +34,10 @@ export class ControlLoop {
     this.input = { ...NEUTRAL_INPUT };
   }
 
-  getStats(): { seq: number; sent: number; skipped: number } {
-    return { seq: this.seq, sent: this.sentCount, skipped: this.skippedCount };
-  }
-
   private tick = (): void => {
     if (this.transport.getStatus().state !== 'connected') return;
     const nextSeq = (this.seq + 1) & 0xff;
-    if (this.transport.send(encodeControl(nextSeq, this.input))) {
-      this.seq = nextSeq;
-      this.sentCount++;
-    } else {
-      this.skippedCount++;
-    }
+    if (this.transport.send(encodeControl(nextSeq, this.input))) this.seq = nextSeq;
   };
 
   /** Trang bị ẩn -> về trung tính, gửi lệnh dừng và ngừng gửi (ESP32 failsafe sau 500 ms). */

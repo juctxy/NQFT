@@ -152,7 +152,7 @@ export class BleTransport implements Transport {
 
   private scheduleReconnect(attempt: number): void {
     if (attempt > MAX_RECONNECT_ATTEMPTS || !this.device) {
-      this.setStatus({ state: 'disconnected', error: 'Mất kết nối, không thể kết nối lại. Bấm Kết nối để thử lại.', errorCode: 'connection' });
+      this.setStatus({ state: 'disconnected', error: 'Mất kết nối, không thể kết nối lại. Bấm BLUETOOTH để thử lại.', errorCode: 'connection' });
       return;
     }
     this.setStatus({ state: 'reconnecting', error: null, errorCode: null });

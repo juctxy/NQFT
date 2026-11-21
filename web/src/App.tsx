@@ -1,237 +1,444 @@
-import { useEffect, useState } from 'react';
-import { useCar } from './hooks/useCar';
+// Giao diện điều khiển — chuyển nguyên từ app NQFT (Expo/React Native, thư mục NQFT/App.tsx) sang web.
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import {
-  chromeIntentUrl,
-  detectPlatform,
-  isBraveBrowser,
-  isInAppBrowser,
-  useInstallPrompt,
-} from './hooks/useInstallPrompt';
+  bluetooth,
+  book,
+  bookOutline,
+  caretBack,
+  caretDown,
+  caretForward,
+  caretUp,
+  close,
+  gameControllerOutline,
+  hardwareChip,
+  keypadOutline,
+  speedometerOutline,
+} from 'ionicons/icons';
+import { Icon } from './components/Icon';
+import { mapInput, type ControlMode, type Direction } from './control/mapInput';
+import { useCar } from './hooks/useCar';
+import { chromeIntentUrl, detectPlatform, isBraveBrowser } from './hooks/platform';
+import { FUNCTION_COUNT, MOTOR_SPEED_MAX } from './protocol/constants';
 import { isWebBluetoothSupported } from './transport/BleTransport';
-import type { ConnectionState } from './transport/Transport';
 
-const APK_URL = 'https://github.com/quanhuy38/NQFT/releases/latest';
 const BLUEFY_URL = 'https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055';
 
-// Trang kiểm tra kết nối tối giản — UI lái thật sẽ thiết kế ở giai đoạn sau.
+function useWindowDimensions() {
+  const read = () => ({ width: window.innerWidth, height: window.innerHeight });
+  const [dims, setDims] = useState(read);
+  useEffect(() => {
+    const onResize = () => setDims(read());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return dims;
+}
 
-const STATE_LABEL: Record<ConnectionState, string> = {
-  disconnected: 'Chưa kết nối',
-  connecting: 'Đang kết nối…',
-  connected: 'Đã kết nối',
-  reconnecting: 'Đang kết nối lại…',
+// ---------- Nút điều hướng (MODE 1) ----------
+type ControlButtonProps = {
+  icon: string;
+  direction: Direction;
+  onPressIn: (d: Direction) => void;
+  onPressOut: (d: Direction) => void;
+  size: number;
 };
 
-function UnsupportedNotice() {
-  const platform = detectPlatform();
-  return (
-    <div className="notice">
-      <strong>Trình duyệt này không hỗ trợ Bluetooth.</strong>
-      {platform === 'ios' ? (
-        <>
-          <p>Trên iPhone/iPad: cài trình duyệt <b>Bluefy</b> (miễn phí) rồi mở lại trang này trong Bluefy.</p>
-          <a className="button" href={BLUEFY_URL} target="_blank" rel="noreferrer">Tải Bluefy trên App Store</a>
-        </>
-      ) : platform === 'android' && isInAppBrowser() ? (
-        <>
-          <p>Bạn đang mở trong ứng dụng khác (Zalo, Facebook…). Hãy mở bằng <b>Chrome</b>.</p>
-          <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
-        </>
-      ) : platform === 'android' ? (
-        <>
-          <p>Hãy mở trang này bằng <b>Chrome</b>, hoặc cài file APK.</p>
-          <div className="row">
-            <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
-            <a className="button secondary" href={APK_URL} target="_blank" rel="noreferrer">Tải APK</a>
-          </div>
-        </>
-      ) : (
-        <p>Hãy mở bằng <b>Chrome</b> hoặc <b>Edge</b>. Firefox và Safari không hỗ trợ.</p>
-      )}
-    </div>
-  );
-}
+function ControlButton({ icon, direction, onPressIn, onPressOut, size }: ControlButtonProps) {
+  const [isPressed, setIsPressed] = useState(false);
 
-const STATE_HINT: Record<ConnectionState, string> = {
-  disconnected: 'Chưa kết nối — chỉ nút Kết nối hoạt động. Bấm Kết nối rồi chọn xe RC-Car-XXXX.',
-  connecting: 'Đang kết nối — chờ vài giây…',
-  connected: 'Đã kết nối — kéo thanh Ga / Lái để gửi lệnh thử.',
-  reconnecting: 'Mất kết nối — đang tự kết nối lại. Bấm Ngắt kết nối để dừng.',
-};
-
-function BraveNotice() {
-  return (
-    <div className="notice">
-      <strong>Bạn đang dùng Brave — Brave chặn Bluetooth cho trang web.</strong>
-      <p>Hãy mở app bằng <b>Google Chrome</b> (và cài app từ Chrome).</p>
-      {detectPlatform() === 'android' && (
-        <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
-      )}
-    </div>
-  );
-}
-
-function InstallHelp() {
-  const platform = detectPlatform();
-  if (platform === 'ios') {
-    return (
-      <ol>
-        <li>Mở trang này trong <b>Bluefy</b>.</li>
-        <li>Lưu trang vào bookmark của Bluefy để mở nhanh lần sau.</li>
-      </ol>
-    );
-  }
-  if (platform === 'android') {
-    return (
-      <>
-        <ol>
-          <li>Bấm menu <b>⋮</b> (góc trên bên phải Chrome).</li>
-          <li>Chọn <b>Cài đặt ứng dụng</b> hoặc <b>Thêm vào màn hình chính</b> → <b>Cài đặt</b>.</li>
-          <li>
-            Nếu menu chỉ có <b>Mở ứng dụng</b>: app vẫn đang được cài — tìm icon <b>RC Car</b> trên màn hình chính.
-            Nếu bạn vừa gỡ app, đóng hẳn Chrome, mở lại trang này rồi thử lại.
-          </li>
-        </ol>
-        <p className="muted">
-          Hoặc cài bằng file APK: <a href={APK_URL} target="_blank" rel="noreferrer">tải APK</a>.
-        </p>
-      </>
-    );
-  }
-  return (
-    <ol>
-      <li>Bấm biểu tượng <b>Cài đặt</b> (màn hình có mũi tên) ở cuối thanh địa chỉ Chrome/Edge,</li>
-      <li>hoặc menu <b>⋮ → Truyền, lưu và chia sẻ → Cài đặt trang dưới dạng ứng dụng</b>.</li>
-    </ol>
-  );
-}
-
-function InstallBanner() {
-  const { standalone, justInstalled, canPrompt, install } = useInstallPrompt();
-  const [showHelp, setShowHelp] = useState(false);
-
-  // Đang chạy trong app đã cài -> không cần nút cài.
-  if (standalone) return null;
-
-  const onClick = async () => {
-    if (canPrompt) {
-      const accepted = await install();
-      if (!accepted) setShowHelp(true);
-    } else {
-      setShowHelp((v) => !v);
-    }
+  const down = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsPressed(true);
+    onPressIn(direction);
+  };
+  const up = () => {
+    setIsPressed(false);
+    onPressOut(direction);
   };
 
   return (
-    <div className="install">
-      <div className="install-row">
-        <span>
-          {justInstalled
-            ? <>Đã cài <b>RC Car</b> — mở app từ màn hình chính.</>
-            : <>Cài <b>RC Car</b> lên màn hình chính để mở nhanh, chạy cả khi không có mạng.</>}
-        </span>
-        <button onClick={onClick}>{canPrompt ? '📲 Cài app' : showHelp ? 'Ẩn hướng dẫn' : '📲 Cách cài app'}</button>
+    <div
+      className={`control-button${isPressed ? ' pressed' : ''}`}
+      style={{ width: size, height: size }}
+      onPointerDown={down}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onLostPointerCapture={() => isPressed && up()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div className="control-button-inner">
+        <Icon src={icon} size={Math.floor(size * 0.42)} color={isPressed ? '#08252B' : '#BCF8F9'} />
       </div>
-      {showHelp && <InstallHelp />}
     </div>
   );
 }
 
-function AxisSlider(props: { label: string; value: number; onChange: (v: number) => void; disabled: boolean }) {
+// ---------- Joystick (MODE 2) ----------
+function VirtualJoystick({ size = 190, onMove }: { size?: number; onMove: (x: number, y: number) => void }) {
+  const knobSize = size * 0.36;
+  const maxRadius = (size - knobSize) / 2;
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const start = useRef<{ id: number; x: number; y: number } | null>(null);
+
+  const down = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    start.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    setDragging(true);
+  };
+
+  const move = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const s = start.current;
+    if (!s || s.id !== e.pointerId) return;
+    let dx = e.clientX - s.x;
+    let dy = e.clientY - s.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance > maxRadius) {
+      const angle = Math.atan2(dy, dx);
+      dx = Math.cos(angle) * maxRadius;
+      dy = Math.sin(angle) * maxRadius;
+    }
+    setPos({ x: dx, y: dy });
+    onMove(Math.round((dx / maxRadius) * 100), Math.round((-dy / maxRadius) * 100));
+  };
+
+  const release = () => {
+    if (!start.current) return;
+    start.current = null;
+    setDragging(false);
+    setPos({ x: 0, y: 0 });
+    onMove(0, 0);
+  };
+
   return (
-    <label className="slider">
-      <span>
-        {props.label}: <b>{props.value}</b>
-      </span>
-      <input
-        type="range"
-        min={-100}
-        max={100}
-        value={props.value}
-        disabled={props.disabled}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-        // Thả tay -> tự về 0 (giống joystick)
-        onPointerUp={() => props.onChange(0)}
-        onPointerCancel={() => props.onChange(0)}
-      />
-    </label>
+    <div className="joystick-wrapper">
+      <div className="joystick-base" style={{ width: size, height: size, borderRadius: size / 2 }}>
+        <div className="crosshair-horizontal" />
+        <div className="crosshair-vertical" />
+        <div className="joystick-inner-ring" />
+        <div
+          className={`joystick-knob${dragging ? ' dragging' : ''}`}
+          style={{
+            width: knobSize,
+            height: knobSize,
+            borderRadius: knobSize / 2,
+            transform: `translate(${pos.x}px, ${pos.y}px)`,
+          }}
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={release}
+          onPointerCancel={release}
+          onLostPointerCapture={release}
+        >
+          <div className="joystick-knob-core" />
+        </div>
+      </div>
+    </div>
   );
 }
 
-export default function App() {
-  const { status, telemetry, telemetryAt, connect, disconnect, controlLoop } = useCar();
-  const [throttle, setThrottle] = useState(0);
-  const [steering, setSteering] = useState(0);
-  const [stats, setStats] = useState(controlLoop.getStats());
-  const supported = isWebBluetoothSupported();
-  const connected = status.state === 'connected';
-  const busy = status.state === 'connecting' || status.state === 'reconnecting';
+// ---------- 4 nút Function (chỉ chọn 1) ----------
+function FunctionButtons({
+  selectedFunc,
+  onSelectFunc,
+  layout,
+}: {
+  selectedFunc: number;
+  onSelectFunc: (f: number) => void;
+  layout: 'grid' | 'row';
+}) {
+  const buttons = Array.from({ length: FUNCTION_COUNT }, (_, i) => i + 1);
+  return (
+    <div className={layout === 'grid' ? 'func-grid' : 'func-row'}>
+      {buttons.map((f) => {
+        const isActive = selectedFunc === f;
+        return (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onSelectFunc(f)}
+            className={`func-button ${layout === 'grid' ? 'func-button-grid' : 'func-button-row'}${isActive ? ' active' : ''}`}
+          >
+            <span className={`func-led${isActive ? ' on' : ''}`} />
+            <span className="func-button-text">F{f}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-  useEffect(() => controlLoop.setInput({ throttle, steering }), [controlLoop, throttle, steering]);
+// ---------- Thanh tốc độ motor ----------
+function MotorSlider({ motorName, speed, onSpeedChange }: { motorName: string; speed: number; onSpeedChange: (v: number) => void }) {
+  return (
+    <div className="motor-card">
+      <div className="motor-header">
+        <div className="motor-title-row">
+          <Icon src={speedometerOutline} size={14} color="#7AE4E6" />
+          <span className="motor-name">{motorName}</span>
+        </div>
+        <span className="speed-value">{speed}</span>
+      </div>
+      <input
+        className="slider"
+        type="range"
+        min={0}
+        max={MOTOR_SPEED_MAX}
+        step={1}
+        value={speed}
+        aria-label={motorName}
+        style={{ '--fill': `${(speed / MOTOR_SPEED_MAX) * 100}%` } as CSSProperties}
+        onChange={(e) => onSpeedChange(Math.round(Number(e.target.value)))}
+      />
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (!connected) {
-      setThrottle(0);
-      setSteering(0);
+// ---------- Hướng dẫn (overlay) ----------
+function GuideOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="overlay-backdrop" onClick={onClose}>
+      <div className="overlay-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <Icon src={book} size={18} color="#BCF8F9" />
+          <span className="modal-title">HƯỚNG DẪN SỬ DỤNG - WATT'UP</span>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Đóng">
+            <Icon src={close} size={22} color="#88C9CE" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <div className="guide-section">
+            <div className="guide-heading">1. Chọn phần cứng (Hardware)</div>
+            <div className="guide-text">
+              • Vi điều khiển: ESP32 có BLE (ESP32 WROOM-32, C3, S3, C6). Không dùng HC-05 / HC-06 (Bluetooth thường, trình duyệt không kết nối được).<br />
+              • Mạch điều khiển động cơ: L298N hoặc mạch cầu H tương thích PWM.<br />
+              • Nguồn điện ổn định cho xe điều khiển cấp THPT (5V - 12V).
+            </div>
+          </div>
+
+          <div className="guide-section">
+            <div className="guide-heading">2. Kết nối không dây (Connection)</div>
+            <div className="guide-text">
+              • Bật Bluetooth trên điện thoại và nguồn của xe.<br />
+              • Nhấn nút <b className="guide-strong">BLUETOOTH</b> trên app để quét và ghép nối với thiết bị phần cứng của đội.<br />
+              • Đảm bảo khoảng cách ổn định trong phạm vi 5–6 mét theo yêu cầu cuộc thi.
+            </div>
+          </div>
+
+          <div className="guide-section">
+            <div className="guide-heading">3. Cấu hình UUID cho ESP32</div>
+            <div className="guide-text">
+              • Định nghĩa Service UUID và Characteristic UUID trong code Arduino/ESP32 trùng khớp với mã UUID cấu hình trên App BLE.<br />
+              • Gói tin 4 byte (seq, ga, lái, cờ F1-F4) gửi 30 lần/giây, xem docs/protocol.md.
+            </div>
+          </div>
+        </div>
+
+        <button type="button" className="modal-close-button" onClick={onClose}>
+          ĐÃ HIỂU
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Trình duyệt không dùng được Bluetooth: hỏi mở bằng trình duyệt phù hợp. */
+function explainUnsupported() {
+  const platform = detectPlatform();
+  if (platform === 'android') {
+    const why = isBraveBrowser()
+      ? 'Brave chặn Bluetooth cho trang web.'
+      : 'Trình duyệt này không hỗ trợ Bluetooth (Zalo, Facebook, Firefox…).';
+    if (window.confirm(`${why}\n\nMở app bằng Google Chrome?`)) window.location.href = chromeIntentUrl();
+  } else if (platform === 'ios') {
+    if (window.confirm('Safari trên iPhone/iPad không hỗ trợ Bluetooth cho web.\n\nTải trình duyệt Bluefy (miễn phí)?')) {
+      window.open(BLUEFY_URL, '_blank', 'noreferrer');
     }
-  }, [connected]);
+  } else {
+    window.alert(
+      isBraveBrowser()
+        ? 'Brave chặn Bluetooth cho trang web. Hãy mở bằng Chrome hoặc Edge.'
+        : 'Trình duyệt này không hỗ trợ Bluetooth. Hãy mở bằng Chrome hoặc Edge.',
+    );
+  }
+}
 
+// ---------- Ứng dụng chính ----------
+export default function App() {
+  const { width, height } = useWindowDimensions();
+  const { status, connect, disconnect, controlLoop } = useCar();
+
+  const buttonSize = Math.min(130, Math.max(82, Math.floor(Math.min(width, height) * 0.18)));
+
+  const [mode, setMode] = useState<ControlMode>('MODE_1');
+  const [guideVisible, setGuideVisible] = useState(false);
+  const [pressedDirections, setPressedDirections] = useState<Direction[]>([]);
+  const [motor1Speed, setMotor1Speed] = useState(128);
+  const [motor2Speed, setMotor2Speed] = useState(128);
+  const [selectedFunc, setSelectedFunc] = useState(0);
+  // Joystick đổi liên tục -> giữ trong ref để không render lại cả app.
+  const joystick = useRef({ x: 0, y: 0 });
+
+  const btConnected = status.state === 'connected';
+  const btBusy = status.state === 'connecting' || status.state === 'reconnecting';
+
+  const latest = useRef({ mode, pressedDirections, motor1Speed, motor2Speed, selectedFunc });
+  latest.current = { mode, pressedDirections, motor1Speed, motor2Speed, selectedFunc };
+
+  const pushInput = () => {
+    const s = latest.current;
+    controlLoop.setInput(
+      mapInput({
+        mode: s.mode,
+        pressed: s.pressedDirections,
+        joystick: joystick.current,
+        motor1Speed: s.motor1Speed,
+        motor2Speed: s.motor2Speed,
+        func: s.selectedFunc,
+      }),
+    );
+  };
+
+  // Mỗi khi trạng thái UI đổi (hoặc vừa kết nối lại) -> cập nhật lệnh gửi đi.
+  useEffect(pushInput, [mode, pressedDirections, motor1Speed, motor2Speed, selectedFunc, status.state]);
+
+  // Đổi chế độ / ẩn app -> thả hết nút, joystick về giữa.
   useEffect(() => {
-    const id = setInterval(() => setStats(controlLoop.getStats()), 500);
-    return () => clearInterval(id);
-  }, [controlLoop]);
+    joystick.current = { x: 0, y: 0 };
+    setPressedDirections([]);
+  }, [mode]);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) {
+        joystick.current = { x: 0, y: 0 };
+        setPressedDirections([]);
+      }
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, []);
+
+  // Lỗi kết nối -> hộp thoại của trình duyệt (UI NQFT không có vùng báo lỗi).
+  useEffect(() => {
+    if (status.error) window.alert(status.error);
+  }, [status.error]);
+
+  const handleBluetooth = () => {
+    if (status.state !== 'disconnected') {
+      disconnect();
+      return;
+    }
+    if (!isWebBluetoothSupported() || isBraveBrowser()) {
+      explainUnsupported();
+      return;
+    }
+    void connect();
+  };
+
+  const handleSelectFunc = (f: number) => setSelectedFunc((prev) => (prev === f ? 0 : f));
+  const handlePressIn = (d: Direction) => setPressedDirections((prev) => (prev.includes(d) ? prev : [...prev, d]));
+  const handlePressOut = (d: Direction) => setPressedDirections((prev) => prev.filter((item) => item !== d));
+
+  const motors = (
+    <div className="motor-controls">
+      <MotorSlider motorName="MOTOR 1" speed={motor1Speed} onSpeedChange={setMotor1Speed} />
+      <MotorSlider motorName="MOTOR 2" speed={motor2Speed} onSpeedChange={setMotor2Speed} />
+    </div>
+  );
 
   return (
-    <main>
-      <h1>RC Car — Kiểm tra kết nối</h1>
+    <div className="screen">
+      <div className="scroll-content">
+        <div className="control-panel">
+          {/* TOP BAR: trái tên nhóm - phải các nút */}
+          <div className="top-bar">
+            <div className="brand">
+              <Icon src={hardwareChip} size={20} color="#BCF8F9" />
+              <span className="brand-text">Watt'up Debuggers</span>
+            </div>
 
-      {!supported && <UnsupportedNotice />}
-      {supported && isBraveBrowser() && <BraveNotice />}
-      {supported && !isBraveBrowser() && <InstallBanner />}
+            <div className="top-right-actions">
+              <button
+                type="button"
+                onClick={() => setMode('MODE_1')}
+                className={`top-action-button${mode === 'MODE_1' ? ' mode-active' : ''}`}
+              >
+                <Icon src={keypadOutline} size={14} color={mode === 'MODE_1' ? '#08252B' : '#88C9CE'} />
+                <span className="top-action-text">MODE 1</span>
+              </button>
 
-      <section className="card">
-        <div className={`state state-${status.state}`}>{STATE_LABEL[status.state]}</div>
-        <div className="hint">{STATE_HINT[status.state]}</div>
-        {status.deviceName && <div>Thiết bị: {status.deviceName}</div>}
-        {status.error && <div className="error">{status.error}</div>}
-        {(status.errorCode === 'disabled' || status.errorCode === 'unsupported') &&
-          detectPlatform() === 'android' && !isBraveBrowser() && (
-            <a className="button" href={chromeIntentUrl()}>Mở bằng Chrome</a>
+              <button
+                type="button"
+                onClick={() => setMode('MODE_2')}
+                className={`top-action-button${mode === 'MODE_2' ? ' mode-active' : ''}`}
+              >
+                <Icon src={gameControllerOutline} size={14} color={mode === 'MODE_2' ? '#08252B' : '#88C9CE'} />
+                <span className="top-action-text">MODE 2</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBluetooth}
+                className={`top-action-button ${btConnected ? 'bt-connected' : 'bt-disconnected'}${btBusy ? ' bt-busy' : ''}`}
+                title={btConnected || btBusy ? 'Bấm để ngắt kết nối' : 'Bấm để kết nối xe RC-Car-XXXX'}
+              >
+                <Icon src={bluetooth} size={14} color={btConnected ? '#08252B' : '#88C9CE'} />
+                <span className="top-action-text">{btConnected ? 'CONNECTED' : 'BLUETOOTH'}</span>
+              </button>
+
+              <button type="button" onClick={() => setGuideVisible(true)} className="top-action-button guide-button">
+                <Icon src={bookOutline} size={14} color="#BCF8F9" />
+                <span className="top-action-text guide-text-color">HƯỚNG DẪN</span>
+              </button>
+            </div>
+          </div>
+
+          {mode === 'MODE_1' ? (
+            /* ================= CHẾ ĐỘ 1 ================= */
+            <div className="main-control">
+              <div className="left-column-mode1">
+                <ControlButton icon={caretUp} direction="UP" size={buttonSize} onPressIn={handlePressIn} onPressOut={handlePressOut} />
+                <ControlButton icon={caretDown} direction="DOWN" size={buttonSize} onPressIn={handlePressIn} onPressOut={handlePressOut} />
+              </div>
+
+              <div className="center-column-mode1">
+                <FunctionButtons selectedFunc={selectedFunc} onSelectFunc={handleSelectFunc} layout="grid" />
+              </div>
+
+              <div className="right-column-mode1">
+                {motors}
+                <div className="horizontal-controls">
+                  <ControlButton icon={caretBack} direction="LEFT" size={buttonSize} onPressIn={handlePressIn} onPressOut={handlePressOut} />
+                  <ControlButton icon={caretForward} direction="RIGHT" size={buttonSize} onPressIn={handlePressIn} onPressOut={handlePressOut} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ================= CHẾ ĐỘ 2 ================= */
+            <div className="main-control">
+              <div className="left-column-mode2">
+                <VirtualJoystick
+                  size={Math.min(230, Math.floor(height * 0.6))}
+                  onMove={(x, y) => {
+                    joystick.current = { x, y };
+                    pushInput();
+                  }}
+                />
+              </div>
+
+              <div className="right-column-mode2">
+                {motors}
+                <div className="func-under-motor">
+                  <FunctionButtons selectedFunc={selectedFunc} onSelectFunc={handleSelectFunc} layout="row" />
+                </div>
+              </div>
+            </div>
           )}
-        <div className="row">
-          {/* Không khóa khi trình duyệt thiếu Bluetooth: bấm vẫn hiện lý do thay vì "không có gì xảy ra". */}
-          <button onClick={connect} disabled={status.state !== 'disconnected'}>
-            Kết nối
-          </button>
-          <button onClick={disconnect} disabled={status.state === 'disconnected'}>
-            Ngắt kết nối
-          </button>
         </div>
-        {busy && <div className="muted">Đang chờ ESP32…</div>}
-      </section>
+      </div>
 
-      <section className="card">
-        <h2>Lệnh thử</h2>
-        <AxisSlider label="Ga" value={throttle} onChange={setThrottle} disabled={!connected} />
-        <AxisSlider label="Lái" value={steering} onChange={setSteering} disabled={!connected} />
-        <div className="muted">
-          seq {stats.seq} · đã gửi {stats.sent} · bỏ qua {stats.skipped}
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>Telemetry</h2>
-        {telemetry ? (
-          <ul>
-            <li>Pin: {telemetry.batteryMv ? `${(telemetry.batteryMv / 1000).toFixed(2)} V` : 'chưa có cảm biến'}</li>
-            <li>Failsafe: {telemetry.failsafe ? 'ĐANG DỪNG' : 'bình thường'}</li>
-            <li>Gói cuối xe nhận: seq {telemetry.lastSeq}</li>
-            <li className="muted">Cập nhật lúc {telemetryAt ? new Date(telemetryAt).toLocaleTimeString() : '-'}</li>
-          </ul>
-        ) : (
-          <div className="muted">Chưa có dữ liệu</div>
-        )}
-      </section>
-    </main>
+      {guideVisible && <GuideOverlay onClose={() => setGuideVisible(false)} />}
+    </div>
   );
 }

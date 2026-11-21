@@ -12,6 +12,7 @@
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
+    "ionicons": "7.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

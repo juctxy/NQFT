@@ -20,13 +20,13 @@
 
 | Điện thoại | Cách cài |
 |---|---|
-| **Android — cách 1 (khuyên dùng)** | Mở link app bằng **Chrome** → bấm nút **📲 Cài app** trong trang (hoặc menu **⋮ → Cài đặt ứng dụng**). App xuất hiện ở màn hình chính, tự cập nhật, chạy được khi không có mạng. |
+| **Android — cách 1 (khuyên dùng)** | Mở link app bằng **Chrome** → bấm **Cài đặt** khi Chrome mời cài app (hoặc menu **⋮ → Cài đặt ứng dụng**). App xuất hiện ở màn hình chính, tự cập nhật, chạy được khi không có mạng. |
 | **Android — cách 2 (file APK)** | Bấm **Tải APK** ở trên → tải file `.apk` → mở file → cho phép *cài từ nguồn không xác định* → Cài đặt. |
 | **iPhone / iPad** | Safari không hỗ trợ Bluetooth cho web. Cài **[Bluefy – Web BLE Browser](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055)** (miễn phí) → mở link app trong Bluefy. |
 
-⚠️ Đừng mở link trong Zalo / Facebook / Messenger — các app này chặn Bluetooth. Trang sẽ hiện nút **Mở bằng Chrome**.
+⚠️ Đừng mở link trong Zalo / Facebook / Messenger — các app này chặn Bluetooth. Bấm **BLUETOOTH** sẽ hiện hộp thoại hỏi **mở bằng Chrome**.
 
-Sau khi mở app: bật Bluetooth → bấm **Kết nối** → chọn `RC-Car-XXXX`. Chi tiết: [`HUONG_DAN_KET_NOI.md`](HUONG_DAN_KET_NOI.md) mục 10–11.
+Sau khi mở app: bật Bluetooth → bấm **BLUETOOTH** → chọn `RC-Car-XXXX`. Chi tiết: [`HUONG_DAN_KET_NOI.md`](HUONG_DAN_KET_NOI.md) mục 10–11.
 
 ---
 

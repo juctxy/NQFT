@@ -19,13 +19,22 @@ export const ControlFlag = {
   Brake: 1 << 2,
 } as const;
 
-/** Nút Function F1..F4: số 0..4 (0 = không chọn) nằm ở bit 3..5 của flags. */
-export const FUNCTION_SHIFT = 3;
-export const FUNCTION_MASK = 0b111 << FUNCTION_SHIFT;
-export const FUNCTION_COUNT = 4;
-
-/** Giá trị tối đa của thanh tốc độ Motor 1 / Motor 2 trên UI. */
-export const MOTOR_SPEED_MAX = 255;
+/**
+ * Nút hành động đang giữ: mã 0..6 ở bit 3..5 của flags (0 = không nhấn).
+ * 1..4 = FUNC 1..4, 5 = CẢN, 6 = SÚT.
+ */
+export const ACTION_SHIFT = 3;
+export const ACTION_MASK = 0b111 << ACTION_SHIFT;
+export const ActionCode = {
+  None: 0,
+  Func1: 1,
+  Func2: 2,
+  Func3: 3,
+  Func4: 4,
+  Block: 5,
+  Kick: 6,
+} as const;
+export type ActionCodeValue = (typeof ActionCode)[keyof typeof ActionCode];
 
 export const TelemetryStatus = {
   Failsafe: 1 << 0,

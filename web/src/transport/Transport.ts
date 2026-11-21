@@ -23,7 +23,12 @@ export interface TransportStatus {
  * WsTransport (Wi-Fi) mà không phải sửa phần còn lại của app.
  */
 export interface Transport {
+  /** Chọn thiết bị + kết nối. */
   connect(): Promise<void>;
+  /** Chỉ chọn thiết bị (hộp thoại của trình duyệt); null nếu Hủy/lỗi. */
+  requestDevice(): Promise<{ id: string; name: string | null } | null>;
+  /** Kết nối tới thiết bị đã chọn. */
+  connectSelected(): Promise<void>;
   disconnect(): void;
   /** Gửi 1 gói. Trả false nếu bỏ qua (chưa kết nối hoặc lần ghi trước chưa xong). */
   send(packet: Uint8Array<ArrayBuffer>): boolean;

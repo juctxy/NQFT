@@ -58,16 +58,20 @@ static ControlCommand unpackCommand(uint32_t p) {
 static ControlCommand g_logged = STOP_COMMAND;  // lệnh in ra Serial gần nhất
 static uint32_t g_lastLogMs = 0;
 
+// Tên nút hành động trong bit 3..5 của flags (để log).
+static const char* actionName(uint8_t flags) {
+  static const char* const NAMES[] = {"-", "FUNC1", "FUNC2", "FUNC3", "FUNC4", "CAN", "SUT", "?"};
+  return NAMES[(flags & ACTION_MASK) >> ACTION_SHIFT];
+}
+
 static void logCommand(const ControlCommand& cmd) {
   bool changed = cmd.throttle != g_logged.throttle ||
                  cmd.steering != g_logged.steering ||
                  cmd.flags    != g_logged.flags;
   uint32_t now = millis();
   if (changed && now - g_lastLogMs >= LOG_INTERVAL_MS) {
-    // fn: nút Function đang chọn trên app (F0 = không chọn, F1..F4)
-    Serial.printf("[CMD] seq=%3u thr=%4d steer=%4d flags=0x%02X fn=F%u\n",
-                  cmd.seq, cmd.throttle, cmd.steering, cmd.flags,
-                  (unsigned)((cmd.flags & FUNCTION_MASK) >> FUNCTION_SHIFT));
+    Serial.printf("[CMD] seq=%3u thr=%4d steer=%4d flags=0x%02X act=%s\n",
+                  cmd.seq, cmd.throttle, cmd.steering, cmd.flags, actionName(cmd.flags));
     g_lastLogMs = now;
     g_logged = cmd;
   }

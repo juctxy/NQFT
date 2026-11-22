@@ -7,7 +7,6 @@ import { ArrowLeftCircle, Download, RotateCcw, Save, Square, Triangle } from 'lu
 import {
   clampJoystick,
   mixDrive,
-  normalizeDriveProfile,
   normalizeJoystick,
   pwmPercent,
   setDriveWheelType,
@@ -32,11 +31,12 @@ import { InstallAppSheet } from './InstallAppSheet';
 import { Slider, Switch } from '../ui/controls';
 import { Pressable, Text, View, type Style } from '../ui/rn';
 
-type Tab = 'speed' | 'motor' | 'profiles';
+type Tab = 'speed' | 'wheel' | 'motor' | 'test';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'speed', label: 'Tốc độ' },
+  { key: 'wheel', label: 'Hướng & bánh' },
   { key: 'motor', label: 'Động cơ' },
-  { key: 'profiles', label: 'Hồ sơ' },
+  { key: 'test', label: 'Chạy thử' },
 ];
 const SPEED_LABELS: Record<keyof LevelSpeeds, string> = {
   vFwd: 'Tiến / lùi (V_fwd)',
@@ -315,21 +315,9 @@ function DirectionMatrix({ profile, onUpdate }: { profile: DriveProfile; onUpdat
   );
 }
 
-function SpeedTab({ profile, level, onUpdate, onSelectLevel, onControlChange, onRotateChange }: { profile: DriveProfile; level: SpeedLevel; onUpdate: (p: DriveProfile) => void; onSelectLevel: (l: SpeedLevel) => void; onControlChange: (v: Vec) => void; onRotateChange: (r: number) => void }) {
+function SpeedTab({ profile, level, onUpdate, onSelectLevel }: { profile: DriveProfile; level: SpeedLevel; onUpdate: (p: DriveProfile) => void; onSelectLevel: (l: SpeedLevel) => void }) {
   return (
     <View style={s.tabContent}>
-      <View style={s.sectionCard}>
-        <Text style={s.sectionTitle}>Loại bánh xe</Text>
-        <View style={s.wheelTypeOptions}>
-          {(['standard', 'omni', 'mecanum'] as const).map((t) => (
-            <Pressable key={t} selected={profile.wheelType === t} onPress={() => onUpdate(setDriveWheelType(profile, t))} style={[s.wheelTypeButton, profile.wheelType === t && s.wheelTypeButtonSelected]}>
-              <Text style={[s.wheelTypeText, profile.wheelType === t && s.wheelTypeTextSelected]}>{wheelTypeName({ wheelType: t })}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <WheelDiagram profile={profile} />
-      </View>
-
       <View style={s.sectionCard}>
         <Text style={s.sectionTitle}>Mức tốc độ</Text>
         <View style={s.levelOptions}>
@@ -354,9 +342,33 @@ function SpeedTab({ profile, level, onUpdate, onSelectLevel, onControlChange, on
             ))}
         </View>
       </View>
+    </View>
+  );
+}
 
-      <TestDrive profile={profile} level={level} onControlChange={onControlChange} onRotateChange={onRotateChange} />
+function WheelTab({ profile, onUpdate }: { profile: DriveProfile; onUpdate: (p: DriveProfile) => void }) {
+  return (
+    <View style={s.tabContent}>
+      <View style={s.sectionCard}>
+        <Text style={s.sectionTitle}>Loại bánh xe</Text>
+        <View style={s.wheelTypeOptions}>
+          {(['standard', 'omni', 'mecanum'] as const).map((t) => (
+            <Pressable key={t} selected={profile.wheelType === t} onPress={() => onUpdate(setDriveWheelType(profile, t))} style={[s.wheelTypeButton, profile.wheelType === t && s.wheelTypeButtonSelected]}>
+              <Text style={[s.wheelTypeText, profile.wheelType === t && s.wheelTypeTextSelected]}>{wheelTypeName({ wheelType: t })}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <WheelDiagram profile={profile} />
+      </View>
       <DirectionMatrix profile={profile} onUpdate={onUpdate} />
+    </View>
+  );
+}
+
+function TestTab({ profile, level, onControlChange, onRotateChange }: { profile: DriveProfile; level: SpeedLevel; onControlChange: (v: Vec) => void; onRotateChange: (r: number) => void }) {
+  return (
+    <View style={s.tabContent}>
+      <TestDrive profile={profile} level={level} onControlChange={onControlChange} onRotateChange={onRotateChange} />
     </View>
   );
 }
@@ -441,169 +453,6 @@ function MotorTab({ profile, onUpdate, onTestMotor }: { profile: DriveProfile; o
   );
 }
 
-function SmallButton({ label, onPress, destructive = false }: { label: string; onPress: () => void; destructive?: boolean }) {
-  return (
-    <Pressable onPress={onPress} style={[s.smallButton, destructive && s.destructiveButton]}>
-      <Text style={[s.smallButtonText, destructive && s.destructiveText]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function ProfilesTab({
-  profile,
-  profiles,
-  activeProfileId,
-  onSelectProfile,
-  onUpdateProfile,
-  onCreateProfile,
-  onDuplicateProfile,
-  onRenameProfile,
-  onDeleteProfile,
-  onImportProfile,
-}: {
-  profile: DriveProfile;
-  profiles: DriveProfile[];
-  activeProfileId: string;
-  onSelectProfile: (id: string) => void;
-  onUpdateProfile: (p: DriveProfile) => void;
-  onCreateProfile: (name: string) => void;
-  onDuplicateProfile: (id: string) => void;
-  onRenameProfile: (id: string, name: string) => void;
-  onDeleteProfile: (id: string) => void;
-  onImportProfile: (p: DriveProfile) => void;
-}) {
-  const [pasted, setPasted] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  const exportProfile = () => {
-    try {
-      const safe = profile.name.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '');
-      const url = URL.createObjectURL(new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safe || 'drive-profile'}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) {
-      setMessage(`Không thể xuất hồ sơ: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-  const importFile = async (file: File) => {
-    try {
-      const data: unknown = JSON.parse(await file.text());
-      if (typeof data !== 'object' || data === null || Array.isArray(data)) throw new Error('Tệp phải chứa một hồ sơ JSON.');
-      onImportProfile(normalizeDriveProfile(data));
-      setMessage(null);
-    } catch (e) {
-      setMessage(`Không thể nhập hồ sơ: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  return (
-    <View style={s.tabContent}>
-      <View style={s.quickProfiles}>
-        {profiles.slice(0, 2).map((p, i) => (
-          <Pressable key={p.id} label={`Chọn nhanh hồ sơ ${i === 0 ? 'A' : 'B'}`} selected={activeProfileId === p.id} onPress={() => onSelectProfile(p.id)} style={[s.quickProfileButton, activeProfileId === p.id && s.quickProfileButtonSelected]}>
-            <Text style={[s.quickProfileText, activeProfileId === p.id && s.quickProfileTextSelected]}>
-              {i === 0 ? 'A' : 'B'} · {p.name}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={s.sectionCard}>
-        <View style={s.sectionHeadingRow}>
-          <Text style={s.sectionTitle}>Hồ sơ trên điện thoại</Text>
-          <Pressable onPress={() => onCreateProfile(`Hồ sơ ${profiles.length + 1}`)} style={s.smallActionButton}>
-            <Text style={s.smallActionText}>+ Tạo hồ sơ</Text>
-          </Pressable>
-        </View>
-        {profiles.map((p) => (
-          <View key={p.id} style={s.profileCard}>
-            <input
-              className="rn-input"
-              aria-label="Tên hồ sơ"
-              defaultValue={p.name}
-              placeholder="Tên hồ sơ"
-              style={s.profileNameInput}
-              onBlur={(e) => onRenameProfile(p.id, e.currentTarget.value)}
-              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            />
-            <Text style={s.profileSummary}>
-              {wheelTypeName(p)} · Vừa: {p.levels.medium.vFwd}/{p.levels.medium.vSide}/{p.levels.medium.vTurn}
-            </Text>
-            <View style={s.profileActions}>
-              <SmallButton label="Tải" onPress={() => onSelectProfile(p.id)} />
-              <SmallButton
-                label="Ghi đè"
-                onPress={() => {
-                  if (window.confirm(`Ghi đè hồ sơ?\n\nThay toàn bộ cài đặt của “${p.name}” bằng cấu hình hiện tại?`)) onUpdateProfile({ ...profile, id: p.id, name: p.name });
-                }}
-              />
-              <SmallButton label="Nhân bản" onPress={() => onDuplicateProfile(p.id)} />
-              <SmallButton
-                label="Xóa"
-                destructive
-                onPress={() => {
-                  if (window.confirm(`Xóa hồ sơ?\n\nBạn có chắc muốn xóa “${p.name}”?`)) onDeleteProfile(p.id);
-                }}
-              />
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <View style={s.sectionCard}>
-        <Text style={s.sectionTitle}>Xuất / nhập tệp JSON</Text>
-        <Text style={s.hintText}>Chia sẻ tệp hồ sơ hoặc chọn tệp JSON đã lưu trên điện thoại.</Text>
-        <Pressable onPress={exportProfile} style={s.primaryActionButton}>
-          <Text style={s.primaryActionText}>Xuất tệp hồ sơ đang dùng</Text>
-        </Pressable>
-        <Pressable onPress={() => fileInput.current?.click()} style={s.secondaryActionButton}>
-          <Text style={s.secondaryActionText}>Chọn tệp JSON để nhập</Text>
-        </Pressable>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,text/json,text/plain,.json"
-          hidden
-          onChange={(e) => {
-            const f = e.currentTarget.files?.[0];
-            e.currentTarget.value = '';
-            if (f) void importFile(f);
-          }}
-        />
-        <textarea
-          className="rn-input"
-          aria-label="Dán JSON hồ sơ để nhập"
-          placeholder="Dán nội dung JSON hồ sơ vào đây"
-          value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
-          style={s.importInput}
-        />
-        <Pressable
-          disabled={!pasted.trim()}
-          onPress={() => {
-            try {
-              const p = normalizeDriveProfile(JSON.parse(pasted));
-              onImportProfile({ ...p, id: `import-${Date.now()}`, name: p.name || 'Hồ sơ nhập' });
-              setPasted('');
-              setMessage(null);
-            } catch (e) {
-              setMessage(`Dữ liệu hồ sơ không hợp lệ: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          }}
-          style={[s.secondaryActionButton, !pasted.trim() && s.disabled]}
-        >
-          <Text style={s.secondaryActionText}>Nhập hồ sơ</Text>
-        </Pressable>
-        {message ? <Text style={s.warningText}>{message}</Text> : null}
-      </View>
-    </View>
-  );
-}
-
 export function SettingsScreen({ onClose }: { onClose: () => void }) {
   const c = useController();
   const bt = useBluetooth();
@@ -660,22 +509,13 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           <View style={s.scrollContent}>
             {c.driveSettingsError ? <Text style={s.errorText}>{c.driveSettingsError}</Text> : null}
             {tab === 'speed' ? (
-              <SpeedTab profile={profile} level={level} onUpdate={c.updateDriveProfile} onSelectLevel={c.selectSpeedLevel} onControlChange={drive.setJoystick} onRotateChange={drive.setRotate} />
+              <SpeedTab profile={profile} level={level} onUpdate={c.updateDriveProfile} onSelectLevel={c.selectSpeedLevel} />
+            ) : tab === 'wheel' ? (
+              <WheelTab profile={profile} onUpdate={c.updateDriveProfile} />
             ) : tab === 'motor' ? (
               <MotorTab profile={profile} onUpdate={c.updateDriveProfile} onTestMotor={() => window.alert(NOT_SUPPORTED)} />
             ) : (
-              <ProfilesTab
-                profile={profile}
-                profiles={c.driveSettings.profiles}
-                activeProfileId={c.driveSettings.activeProfileId}
-                onSelectProfile={c.selectDriveProfile}
-                onUpdateProfile={c.updateDriveProfile}
-                onCreateProfile={c.createDriveProfile}
-                onDuplicateProfile={c.duplicateDriveProfile}
-                onRenameProfile={c.renameDriveProfile}
-                onDeleteProfile={c.deleteDriveProfile}
-                onImportProfile={c.addDriveProfile}
-              />
+              <TestTab profile={profile} level={level} onControlChange={drive.setJoystick} onRotateChange={drive.setRotate} />
             )}
           </View>
         </View>
@@ -807,27 +647,6 @@ const s: Record<string, Style> = {
   numericInputWrap: { alignItems: 'center', flexDirection: 'row', gap: 6 },
   settingSuffix: { color: '#64748b', fontSize: 11 },
   settingRange: { color: '#94a3b8', fontSize: 10, minWidth: 50, textAlign: 'right' },
-  quickProfiles: { flexDirection: 'row', gap: 8 },
-  quickProfileButton: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderRadius: 8, borderWidth: 1, flex: '1 1 0%', minHeight: 38, justifyContent: 'center', paddingLeft: 8, paddingRight: 8 },
-  quickProfileButtonSelected: { backgroundColor: '#fff7ed', borderColor: '#f47518' },
-  quickProfileText: { color: '#334155', fontSize: 11, fontWeight: 700, textAlign: 'center' },
-  quickProfileTextSelected: { color: '#c2410c' },
-  sectionHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  smallActionButton: { backgroundColor: '#fff7ed', borderRadius: 7, padding: '7px 9px' },
-  smallActionText: { color: '#c2410c', fontSize: 10, fontWeight: 800 },
-  profileCard: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderRadius: 9, borderWidth: 1, gap: 6, padding: 9 },
-  profileNameInput: { color: '#06324d', fontSize: 13, fontWeight: 800, minHeight: 32, padding: '0 3px', background: 'transparent', border: 0 },
-  profileSummary: { color: '#64748b', fontFamily: mono, fontSize: 10 },
-  profileActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  smallButton: { alignItems: 'center', backgroundColor: '#06324d', borderRadius: 6, flexGrow: 1, flexShrink: 1, justifyContent: 'center', minHeight: 34, paddingLeft: 8, paddingRight: 8 },
-  smallButtonText: { color: '#fff', fontSize: 10, fontWeight: 700 },
-  destructiveButton: { backgroundColor: '#fee2e2' },
-  destructiveText: { color: '#b91c1c' },
-  primaryActionButton: { alignItems: 'center', backgroundColor: '#06324d', borderRadius: 8, justifyContent: 'center', minHeight: 38 },
-  primaryActionText: { color: '#fff', fontSize: 11, fontWeight: 700 },
-  importInput: { backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, color: '#334155', fontFamily: mono, fontSize: 10, minHeight: 100, padding: 8, resize: 'none' },
-  secondaryActionButton: { alignItems: 'center', backgroundColor: '#e2e8f0', borderRadius: 8, justifyContent: 'center', minHeight: 38 },
-  secondaryActionText: { color: '#06324d', fontSize: 11, fontWeight: 800 },
   disabled: { opacity: 0.45 },
   messageWrap: { alignItems: 'center', flex: '1 1 0%', justifyContent: 'center' },
   errorText: { backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#b91c1c', fontSize: 11, padding: 8 },

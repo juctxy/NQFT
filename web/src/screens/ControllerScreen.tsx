@@ -128,7 +128,7 @@ function HoldButton({
 }
 
 export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpenInstructions: () => void; onOpenSettings: () => void }) {
-  const { driveSettings, activeDriveProfile: profile, driveSettingsReady, selectDriveProfile, selectSpeedLevel } = useController();
+  const { driveSettings, activeDriveProfile: profile, driveSettingsReady, selectSpeedLevel } = useController();
   const bt = useBluetooth();
   const drive = useDriveInput(bt.controlLoop, profile, driveSettings.activeLevel, bt.connectionKey);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -144,7 +144,6 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
     bt.stopScan();
   }, [bt]);
 
-  const quick = driveSettings.profiles.slice(0, 2);
   const action = (code: number) => ({ onDown: () => drive.pressButton(code), onUp: () => drive.releaseButton(code) });
 
   return (
@@ -163,21 +162,6 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
               Bánh: {profile.wheelType === 'standard' ? 'Standard' : profile.wheelType === 'omni' ? 'Omni' : 'Mecanum'}
             </Text>
             <SpeedPresetSelector level={driveSettings.activeLevel} ready={driveSettingsReady} onSelectLevel={selectSpeedLevel} />
-            {quick.length > 1 ? (
-              <View style={s.quickSwitchRow}>
-                {quick.map((p, i) => (
-                  <Pressable
-                    key={p.id}
-                    label={`Chọn nhanh hồ sơ ${i === 0 ? 'A' : 'B'}: ${p.name}`}
-                    selected={p.id === profile.id}
-                    onPress={() => selectDriveProfile(p.id)}
-                    style={[s.quickSwitchButton, p.id === profile.id && s.quickSwitchButtonActive]}
-                  >
-                    <Text style={[s.quickSwitchText, p.id === profile.id && s.quickSwitchTextActive]}>{i === 0 ? 'A' : 'B'}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
           </View>
 
           <View style={s.rightTopStack}>
@@ -299,11 +283,6 @@ const s: Record<string, Style> = {
     zIndex: 10,
   },
   wheelTypeLabel: { color: '#334155', fontSize: 11, fontWeight: 700 },
-  quickSwitchRow: { flexDirection: 'row', gap: 4 },
-  quickSwitchButton: { alignItems: 'center', backgroundColor: '#e2e8f0', borderRadius: 5, height: 24, justifyContent: 'center', width: 28 },
-  quickSwitchButtonActive: { backgroundColor: '#f47518' },
-  quickSwitchText: { color: '#334155', fontSize: 10, fontWeight: 800 },
-  quickSwitchTextActive: { color: '#fff' },
   rightTopStack: { alignItems: 'stretch', gap: 6 },
   bluetoothButton: {
     alignItems: 'center',

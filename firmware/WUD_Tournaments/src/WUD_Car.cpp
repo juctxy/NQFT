@@ -4,6 +4,13 @@
 #include <stdarg.h>
 #include "drivers/WUD_L298N.h"
 
+// Core esp32 4.x giải phóng bộ nhớ BLE lúc khởi động nếu không thư viện nào báo đang dùng BLE.
+// NimBLE-Arduino 2.5.x chưa báo, nên thư viện này tự báo; thiếu dòng này NimBLEDevice::init() thất bại.
+// Core 3.x không có header này và không giải phóng bộ nhớ BLE.
+#if __has_include("esp32-hal-alloc-ble-mem.h")
+#include "esp32-hal-alloc-ble-mem.h"
+#endif
+
 WUD_Car Car;
 
 namespace {

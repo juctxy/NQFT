@@ -1,14 +1,6 @@
 name: Deploy PWA
 
 on:
-  push:
-    branches:
-      - main
-      - layout3_mobile2
-  pull_request:
-    branches:
-      - main
-      - layout3_mobile2
   workflow_dispatch:
 
 permissions:

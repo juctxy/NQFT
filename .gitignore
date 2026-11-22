@@ -15,4 +15,4 @@ signing-key-info.txt
 *.apk
 *.aab
 
-docs/superpowers/
+docs/*/

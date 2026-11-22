@@ -16,3 +16,5 @@ signing-key-info.txt
 *.aab
 
 docs/*/
+.venv/
+.history/

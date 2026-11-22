@@ -225,11 +225,11 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
             </HoldButton>
             {profile.wheelType !== 'standard' ? (
               <View style={s.rotateControls}>
-                <HoldButton label="XOAY TRÁI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => drive.setRotate(-1)} onUp={() => drive.setRotate(0)}>
-                  <Text style={s.rotateButtonText}>XOAY TRÁI</Text>
+                <HoldButton label="QUẸO TRÁI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => drive.setRotate(-1)} onUp={() => drive.setRotate(0)}>
+                  <Text style={s.rotateButtonText}>QUẸO TRÁI</Text>
                 </HoldButton>
-                <HoldButton label="XOAY PHẢI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => drive.setRotate(1)} onUp={() => drive.setRotate(0)}>
-                  <Text style={s.rotateButtonText}>XOAY PHẢI</Text>
+                <HoldButton label="QUẸO PHẢI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => drive.setRotate(1)} onUp={() => drive.setRotate(0)}>
+                  <Text style={s.rotateButtonText}>QUẸO PHẢI</Text>
                 </HoldButton>
               </View>
             ) : null}
@@ -237,16 +237,16 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
 
           <View style={s.gripCircle}>
             <View style={s.actionPad}>
-              <HoldButton label="Cản banh" style={sx(s.actionButton, s.actionTop)} pressedStyle={s.pressedButton} {...action(ButtonBit.Block)}>
+              <HoldButton label="Cản banh" style={sx(s.actionButton, s.actionTop)} pressedStyle={s.pressedButton} {...action(ButtonBit.Triangle)}>
                 <Triangle color="#fff" size={22} strokeWidth={2.5} />
               </HoldButton>
-              <HoldButton label="Sút banh" style={sx(s.actionButton, s.actionBottom)} pressedStyle={s.pressedButton} {...action(ButtonBit.Kick)}>
+              <HoldButton label="Sút banh" style={sx(s.actionButton, s.actionBottom)} pressedStyle={s.pressedButton} {...action(ButtonBit.Cross)}>
                 <X color="#fff" size={24} strokeWidth={2.5} />
               </HoldButton>
-              <HoldButton label="Chức năng 3" style={sx(s.actionButton, s.actionLeft)} pressedStyle={s.pressedButton} {...action(ButtonBit.Func3)}>
+              <HoldButton label="Chức năng 3" style={sx(s.actionButton, s.actionLeft)} pressedStyle={s.pressedButton} {...action(ButtonBit.Square)}>
                 <Square color="#fff" size={22} strokeWidth={2.2} />
               </HoldButton>
-              <HoldButton label="Chức năng 4" style={sx(s.actionButton, s.actionRight)} pressedStyle={s.pressedButton} {...action(ButtonBit.Func4)}>
+              <HoldButton label="Chức năng 4" style={sx(s.actionButton, s.actionRight)} pressedStyle={s.pressedButton} {...action(ButtonBit.Circle)}>
                 <Circle color="#fff" size={22} strokeWidth={2.2} />
               </HoldButton>
             </View>

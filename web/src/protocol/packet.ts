@@ -1,11 +1,11 @@
 import { CONTROL_PACKET_LEN, TELEMETRY_PACKET_LEN, TelemetryStatus } from './constants';
 
 export interface ControlInput {
-  /** -100..100: âm = lùi, dương = tiến */
-  throttle: number;
-  /** -100..100: âm = trái, dương = phải */
-  steering: number;
-  /** bitmask ButtonBit: nút đang giữ (bit 0..5) */
+  /** Trục Oy -100..100: dương = hướng lên (tiến) */
+  y: number;
+  /** Trục Ox -100..100: dương = sang phải */
+  x: number;
+  /** bitmask ButtonBit: nút đang giữ (bit 0..7) */
   flags: number;
 }
 
@@ -16,7 +16,7 @@ export interface Telemetry {
   status: number;
 }
 
-export const NEUTRAL_INPUT: ControlInput = { throttle: 0, steering: 0, flags: 0 };
+export const NEUTRAL_INPUT: ControlInput = { y: 0, x: 0, flags: 0 };
 
 function clampAxis(v: number): number {
   if (!Number.isFinite(v)) return 0;
@@ -27,8 +27,8 @@ export function encodeControl(seq: number, input: ControlInput): Uint8Array<Arra
   const buf = new Uint8Array(new ArrayBuffer(CONTROL_PACKET_LEN));
   const view = new DataView(buf.buffer);
   view.setUint8(0, seq & 0xff);
-  view.setInt8(1, clampAxis(input.throttle));
-  view.setInt8(2, clampAxis(input.steering));
+  view.setInt8(1, clampAxis(input.y));
+  view.setInt8(2, clampAxis(input.x));
   view.setUint8(3, input.flags & 0xff);
   return buf;
 }

@@ -4,20 +4,20 @@ import { ButtonBit } from './constants';
 
 describe('encodeControl', () => {
   it('khớp ví dụ trong docs/protocol.md', () => {
-    expect([...encodeControl(1, { throttle: 50, steering: 0, flags: 0 })]).toEqual([0x01, 0x32, 0x00, 0x00]);
-    expect([...encodeControl(2, { throttle: 0, steering: -100, flags: 0 })]).toEqual([0x02, 0x00, 0x9c, 0x00]);
+    expect([...encodeControl(1, { y: 50, x: 0, flags: 0 })]).toEqual([0x01, 0x32, 0x00, 0x00]);
+    expect([...encodeControl(2, { y: 0, x: -100, flags: 0 })]).toEqual([0x02, 0x00, 0x9c, 0x00]);
   });
 
   it('kẹp giá trị ngoài phạm vi và làm tròn', () => {
-    const p = encodeControl(0, { throttle: 250, steering: -180.4, flags: 0 });
+    const p = encodeControl(0, { y: 250, x: -180.4, flags: 0 });
     const v = new DataView(p.buffer);
     expect(v.getInt8(1)).toBe(100);
     expect(v.getInt8(2)).toBe(-100);
-    expect(new DataView(encodeControl(0, { throttle: 12.6, steering: NaN, flags: 0 }).buffer).getInt8(1)).toBe(13);
+    expect(new DataView(encodeControl(0, { y: 12.6, x: NaN, flags: 0 }).buffer).getInt8(1)).toBe(13);
   });
 
   it('seq quay vòng 0..255 và giữ cờ', () => {
-    const p = encodeControl(257, { throttle: 0, steering: 0, flags: ButtonBit.Func1 | ButtonBit.Func3 });
+    const p = encodeControl(257, { y: 0, x: 0, flags: ButtonBit.Func1 | ButtonBit.Square });
     expect(p[0]).toBe(1);
     expect(p[3]).toBe(0b101);
   });

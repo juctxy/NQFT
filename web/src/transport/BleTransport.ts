@@ -57,7 +57,8 @@ export class BleTransport implements Transport {
     try {
       device = await navigator.bluetooth.requestDevice({
         filters: [{ services: [SERVICE_UUID] }, { namePrefix: DEVICE_NAME_PREFIX }],
-        optionalServices: [SERVICE_UUID],
+        // generic_access: để đọc tên thật (0x2A00) sau khi kết nối, xem readDeviceName().
+        optionalServices: [SERVICE_UUID, 'generic_access'],
       });
     } catch (e) {
       const failure = classifyRequestError(e);
@@ -149,6 +150,23 @@ export class BleTransport implements Transport {
     this.telemetry = telemetry;
     this.writing = false;
     this.setStatus({ state: 'connected', error: null, errorCode: null });
+    void this.readDeviceName(server);
+  }
+
+  /**
+   * device.name là tên hệ điều hành nhớ theo địa chỉ MAC (Android cache), có thể là tên của
+   * firmware cũ. Tên thật nằm ở characteristic GAP Device Name (0x2A00) do firmware đặt.
+   * iOS/Bluefy ẩn service GAP -> lỗi thì giữ nguyên device.name.
+   */
+  private async readDeviceName(server: BluetoothRemoteGATTServer): Promise<void> {
+    try {
+      const gap = await server.getPrimaryService('generic_access');
+      const chr = await gap.getCharacteristic('gap.device_name');
+      const name = new TextDecoder().decode(await chr.readValue()).replace(/\0+$/, '').trim();
+      if (name && server.device === this.device) this.setStatus({ deviceName: name });
+    } catch (e) {
+      console.info('[BLE] Khong doc duoc GAP Device Name, dung device.name', e);
+    }
   }
 
   private handleTelemetry = (ev: Event): void => {

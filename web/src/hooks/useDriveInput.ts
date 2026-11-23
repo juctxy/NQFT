@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { mapDrive, type DriveInput } from '../control/mapInput';
+import { mapDrive, UNKNOWN_CAR, type CarSpeedCaps, type DriveInput } from '../control/mapInput';
 import type { ControlLoop } from '../control/ControlLoop';
 import type { DriveProfile, SpeedLevel, Vec } from '../drive/driveModel';
 
@@ -11,19 +11,27 @@ const MIN_PRESS_MS = 150;
  * Các nút là bitmask: giữ nhiều nút cùng lúc thì nhiều bit cùng bằng 1.
  * Dùng ref nên kéo joystick không làm render lại màn hình.
  */
-export function useDriveInput(controlLoop: ControlLoop, profile: DriveProfile, level: SpeedLevel, connectedKey: string) {
+export function useDriveInput(
+  controlLoop: ControlLoop,
+  profile: DriveProfile,
+  level: SpeedLevel,
+  connectedKey: string,
+  car: CarSpeedCaps = UNKNOWN_CAR,
+) {
   const input = useRef<DriveInput>({ joystick: { x: 0, y: 0 }, rotate: 0, buttons: 0 });
   const pressedAt = useRef(new Map<number, number>());
   const releaseTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
-  const config = useRef({ profile, level });
-  config.current = { profile, level };
+  const config = useRef({ profile, level, car });
+  config.current = { profile, level, car };
 
   const push = useCallback(() => {
-    controlLoop.setInput(mapDrive(config.current.profile, config.current.level, input.current));
+    const c = config.current;
+    // speedPwm luôn ghi đè (undefined = gói 4 byte cho xe cũ).
+    controlLoop.setInput({ speedPwm: undefined, ...mapDrive(c.profile, c.level, input.current, c.car) });
   }, [controlLoop]);
 
-  // Đổi hồ sơ / mức tốc độ / vừa kết nối lại -> tính lại lệnh.
-  useEffect(push, [push, profile, level, connectedKey]);
+  // Đổi hồ sơ / mức tốc độ / vừa kết nối lại / biết thêm về xe -> tính lại lệnh.
+  useEffect(push, [push, profile, level, connectedKey, car.speedPwm, car.noPwmPin]);
   // Tăng tốc mềm (trang Động cơ) làm ngay trên web, xe không cần biết.
   useEffect(() => controlLoop.setSoftAccel(profile.softAccelMs), [controlLoop, profile.softAccelMs]);
 

@@ -31,7 +31,8 @@ constexpr uint16_t CONN_TIMEOUT      = 200;  // 2 s
 constexpr const char* PREFS_NS  = "wud";
 constexpr const char* PREFS_KEY = "cfg";
 
-constexpr WUD_Config DEFAULT_CONFIG = {{100, 100, 100, 100}, 0, 0, 50, false, {{0}}};
+// Xoay 100 % = xoay bằng đúng PWM của mức tốc độ đang chọn trên web.
+constexpr WUD_Config DEFAULT_CONFIG = {{100, 100, 100, 100}, 0, 0, 100, false, {{0}}};
 const char* const WHEEL_NAMES[4] = {"FL", "FR", "BL", "BR"};
 
 const char* const BUTTON_NAMES[8] = {"FUNC1", "FUNC2",    "SQUARE",    "CIRCLE",
@@ -284,6 +285,8 @@ void WUD_Car::_bleConnected(bool on) {
 
 void WUD_Car::_bleControl(const uint8_t* d, size_t len) {
   if (len < WUD_CONTROL_PACKET_LEN) return;  // gói không hợp lệ
+  // Byte 4 (v6): PWM của mức tốc độ. Web cũ gửi 4 byte -> 255 như trước. 0 coi như 255.
+  _speedPwm = (len >= WUD_CONTROL_SPEED_LEN && d[4]) ? d[4] : 255;
   _packet = (uint32_t)d[0] | ((uint32_t)d[1] << 8) | ((uint32_t)d[2] << 16) | ((uint32_t)d[3] << 24);
   _packetMs = millis();
   _hasPacket = true;
@@ -347,6 +350,12 @@ void WUD_Car::update() {
       s.x = (int8_t)clamp100((int8_t)((p >> 16) & 0xFF));
       s.flags = (uint8_t)((p >> 24) & 0xFF);
       applySignal(s);
+      uint8_t pwm = _speedPwm;
+      if (pwm != _speedPwmApplied) {
+        _speedPwmApplied = pwm;
+        for (auto& w : _wheels) w.setMaxPwm(pwm);
+        if (_debugMode) logf("[CMD] muc toc do: PWM %u\n", pwm);
+      }
     }
   } else if (_connected && !_failsafe) {
     enterFailsafe(WUD_StopReason::Timeout);
@@ -448,6 +457,13 @@ WUD_Wheel& WUD_Car::attachDriver(WUD_WheelId id, WUD_MotorDriver& driver, bool r
   _wheels[id].attach(&driver, reverse, false);
   _wheelPwm[id] = -1;
   return _wheels[id];
+}
+
+bool WUD_Car::hasPwmPins() const {
+  for (int8_t p : _wheelPwm) {
+    if (p == 0) return false;
+  }
+  return true;
 }
 
 // Chân PWM phải có ở cả 4 bánh L298N hoặc không bánh nào.
@@ -651,7 +667,8 @@ void WUD_Car::sendTelemetry(uint32_t) {
   uint8_t buf[WUD_TELEMETRY_PACKET_LEN] = {
       (uint8_t)(mv & 0xFF),
       (uint8_t)(mv >> 8),
-      (uint8_t)(_failsafe ? WUD_TELEMETRY_FAILSAFE : 0),
+      (uint8_t)((_failsafe ? WUD_TELEMETRY_FAILSAFE : 0) | (hasPwmPins() ? 0 : WUD_TELEMETRY_NO_PWM_PIN) |
+                WUD_TELEMETRY_SPEED_PWM),
       _sig.seq,
   };
   _telemetryChar->setValue(buf, sizeof(buf));

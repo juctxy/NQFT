@@ -8,6 +8,8 @@ import type { Transport } from '../transport/Transport';
 const transport: Transport = new BleTransport();
 const controlLoop = new ControlLoop(transport);
 const sendTest = (wheel: number | null, speed: number) => transport.sendTest(wheel, speed);
+/** Các lần ghi CONFIG chạy lần lượt (Web Bluetooth không cho 2 thao tác cùng lúc trên 1 characteristic). */
+let saveQueue: Promise<unknown> = Promise.resolve();
 
 export function useCar() {
   const status = useSyncExternalStore(
@@ -49,13 +51,17 @@ export function useCar() {
   }, [status.state]);
 
   /** Ghi CONFIG rồi đọc lại để xác nhận. Trả về cấu hình xe đang dùng (null nếu không đọc được). */
-  const saveConfig = useCallback(async (config: CarConfig) => {
-    await transport.writeConfig(config);
-    // Xe xử lý CONFIG trong loop() rồi mới cập nhật giá trị đọc được -> đợi một chút.
-    await new Promise((r) => setTimeout(r, 300));
-    const back = await transport.readConfig();
-    setCarConfig(back);
-    return back;
+  const saveConfig = useCallback((config: CarConfig) => {
+    const run = saveQueue.then(async () => {
+      await transport.writeConfig(config);
+      // Xe xử lý CONFIG trong loop() rồi mới cập nhật giá trị đọc được -> đợi một chút.
+      await new Promise((r) => setTimeout(r, 300));
+      const back = await transport.readConfig();
+      setCarConfig(back);
+      return back;
+    });
+    saveQueue = run.catch(() => undefined);
+    return run;
   }, []);
 
   return {

@@ -17,11 +17,13 @@ interface CalibrateSubPageProps {
   level: SpeedLevel;
   onControlChange: (v: Vec) => void;
   onRotateChange: (r: number) => void;
+  noPwmPin?: boolean;
 }
 
 export function CalibrateSubPage({
   profile,
   level,
+  noPwmPin = false,
   onControlChange,
   onRotateChange,
 }: CalibrateSubPageProps) {
@@ -50,7 +52,7 @@ export function CalibrateSubPage({
     onRotateChange(0);
   };
 
-  const pwm = mixDrive(profile, level, joy, rotate);
+  const pwm = mixDrive(profile, level, joy, rotate, noPwmPin);
 
   const rot = (r: number) => ({
     onPressIn: () => {

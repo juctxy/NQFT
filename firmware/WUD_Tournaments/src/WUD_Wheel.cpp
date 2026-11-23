@@ -36,6 +36,12 @@ void WUD_Wheel::test(int speed) {
   apply();
 }
 
+void WUD_Wheel::setMaxPwm(uint8_t pwm) {
+  _maxPwm = pwm;
+  _dirty = true;
+  apply();
+}
+
 void WUD_Wheel::apply() {
   if (!_driver) return;
   long duty;
@@ -45,7 +51,7 @@ void WUD_Wheel::apply() {
     duty = (long)abs(s) * 255L / 100L;
   } else {
     s = (_reverse != _invert) ? -_speed : _speed;
-    duty = (long)abs(s) * 255L * _trim / 10000L;
+    duty = (long)abs(s) * _maxPwm * _trim / 10000L;
     if (duty > 0 && duty < _minPwm) duty = _minPwm;
   }
   if (duty > 255) duty = 255;

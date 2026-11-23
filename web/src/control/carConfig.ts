@@ -9,17 +9,17 @@ const signs = (row: Record<(typeof WHEEL_IDS)[number], number>): WheelSigns =>
  * - trim        = "Bù công suất" từng bánh (80..100 %)
  * - minPwm      = "PWM tối thiểu (vùng chết)"
  * - invertMask  = công tắc "Đảo chiều" từng động cơ
- * - turnSpeed   = V_turn của mức tốc độ đang chọn, đổi sang % (nút QUẸO trên xe mecanum/omni)
+ * - turnSpeed   = 100 %: nút QUẸO xoay bằng đúng PWM của mức tốc độ đang chọn
  * - matrix      = "Ma trận hướng"; customMatrix = người dùng đã sửa ma trận.
  *   Chưa sửa thì xe dùng công thức có sẵn theo loại xe trong code (setDriveType).
  * Thứ tự bánh FL, FR, BL, BR (web gọi bánh sau là rl/rr).
  */
-export function configFromProfile(profile: DriveProfile, level: SpeedLevel): CarConfig {
+export function configFromProfile(profile: DriveProfile, _level?: SpeedLevel): CarConfig {
   return {
     trim: WHEEL_IDS.map((w) => profile.motors[w].compensation) as CarConfig['trim'],
     minPwm: profile.minPwm,
     invertMask: WHEEL_IDS.reduce((m, w, i) => (profile.motors[w].inverted ? m | (1 << i) : m), 0),
-    turnSpeed: Math.round((profile.levels[level].vTurn / 255) * 100),
+    turnSpeed: 100,
     customMatrix: profile.customMatrix,
     matrix: { fwd: signs(profile.matrix.fwd), side: signs(profile.matrix.side), turn: signs(profile.matrix.turn) },
   };

@@ -15,7 +15,6 @@ export const SPEED_LEVEL_LABELS: Record<SpeedLevel, string> = { slow: 'Chậm', 
 export type WheelType = 'standard' | 'omni' | 'mecanum';
 export type MatrixSign = -1 | 0 | 1;
 export type DriveMatrix = Record<DriveAxis, Record<WheelId, MatrixSign>>;
-export interface LevelSpeeds { vFwd: number; vSide: number; vTurn: number }
 export interface MotorOptions { inverted: boolean; compensation: number }
 
 export interface DriveProfile {
@@ -24,7 +23,6 @@ export interface DriveProfile {
   wheelType: WheelType;
   matrix: DriveMatrix;
   customMatrix: boolean;
-  levels: Record<SpeedLevel, LevelSpeeds>;
   motors: Record<WheelId, MotorOptions>;
   minPwm: number;
   maxLimit: number;
@@ -44,11 +42,8 @@ const SIDE: Record<WheelId, MatrixSign> = { fl: 1, fr: -1, rl: -1, rr: 1 };
 const TURN: Record<WheelId, MatrixSign> = { fl: 1, fr: -1, rl: 1, rr: -1 };
 const STANDARD_MATRIX: DriveMatrix = { fwd: { ...ONES }, side: { fl: 0, fr: 0, rl: 0, rr: 0 }, turn: { ...TURN } };
 const HOLONOMIC_MATRIX: DriveMatrix = { fwd: { ...ONES }, side: { ...SIDE }, turn: { ...TURN } };
-const DEFAULT_LEVELS: Record<SpeedLevel, LevelSpeeds> = {
-  slow: { vFwd: 130, vSide: 130, vTurn: 130 },
-  medium: { vFwd: 190, vSide: 190, vTurn: 190 },
-  fast: { vFwd: 255, vSide: 255, vTurn: 255 },
-};
+/** PWM cố định của từng mức tốc độ. Joystick chỉ chọn HƯỚNG, tốc độ do mức này quyết định. */
+export const LEVEL_PWM: Record<SpeedLevel, number> = { slow: 140, medium: 200, fast: 255 };
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -74,17 +69,6 @@ function normalizeMatrix(raw: unknown, wheelType: WheelType): DriveMatrix {
   return { fwd: axis('fwd'), side: axis('side'), turn: axis('turn') };
 }
 
-function normalizeLevels(raw: unknown): Record<SpeedLevel, LevelSpeeds> {
-  const src = isObj(raw) ? raw : {};
-  return Object.fromEntries(
-    SPEED_LEVELS.map((l) => {
-      const s = isObj(src[l]) ? (src[l] as Obj) : {};
-      const d = DEFAULT_LEVELS[l];
-      return [l, { vFwd: clampInt(s.vFwd, d.vFwd, 0, 255), vSide: clampInt(s.vSide, d.vSide, 0, 255), vTurn: clampInt(s.vTurn, d.vTurn, 0, 255) }];
-    }),
-  ) as Record<SpeedLevel, LevelSpeeds>;
-}
-
 function normalizeMotors(raw: unknown): Record<WheelId, MotorOptions> {
   const src = isObj(raw) ? raw : {};
   return Object.fromEntries(
@@ -102,7 +86,6 @@ export function createDefaultDriveProfile(id: string, name: string): DriveProfil
     wheelType: 'standard',
     matrix: copyMatrix(STANDARD_MATRIX),
     customMatrix: false,
-    levels: normalizeLevels(DEFAULT_LEVELS),
     motors: Object.fromEntries(WHEEL_IDS.map((w) => [w, { inverted: false, compensation: 100 }])) as Record<WheelId, MotorOptions>,
     minPwm: 35,
     maxLimit: 255,
@@ -126,7 +109,6 @@ export function normalizeDriveProfile(raw: unknown): DriveProfile {
     wheelType,
     matrix: normalizeMatrix(p.matrix, wheelType),
     customMatrix: p.customMatrix === true,
-    levels: normalizeLevels(p.levels),
     motors: normalizeMotors(p.motors),
     minPwm: clampInt(p.minPwm, 35, 0, maxLimit),
     maxLimit,
@@ -187,25 +169,44 @@ export function applyMotorLimits(values: Record<WheelId, number>, profile: Drive
 }
 
 /** PWM từng bánh (dùng cho phần "Chạy thử" trong Settings). */
-export function mixDrive(profile: DriveProfile, level: SpeedLevel, joystick: Vec, rotate: number): Record<WheelId, number> {
+/**
+ * Chỉ giữ HƯỚNG của joystick: kéo dài để thành phần lớn nhất = 1 (đẩy nhẹ hay hết cỡ như nhau).
+ * Ví dụ (0.3, 0) -> (1, 0); (0.5, 0.5) -> (1, 1). Ở giữa (đã qua vùng chết) -> (0, 0).
+ */
+export function joystickDirection(j: Vec): Vec {
+  const m = Math.max(Math.abs(j.x), Math.abs(j.y));
+  if (m === 0) return { x: 0, y: 0 };
+  return { x: j.x / m, y: j.y / m };
+}
+
+/** PWM của mức tốc độ; xe chưa có chân PWM -> luôn 255. */
+export function levelPwm(level: SpeedLevel, noPwmPin = false): number {
+  return noPwmPin ? 255 : LEVEL_PWM[level];
+}
+
+/**
+ * PWM dự kiến của 4 bánh (hiển thị trên web), tính giống xe:
+ * hướng joystick -> trộn theo ma trận -> chia đều nếu vượt 100 % -> × PWM của mức -> bù, đảo chiều.
+ */
+export function mixDrive(profile: DriveProfile, level: SpeedLevel, joystick: Vec, rotate: number, noPwmPin = false): Record<WheelId, number> {
   const p = normalizeDriveProfile(profile);
-  const j = normalizeJoystick(joystick.x, joystick.y);
-  const s = p.levels[level];
-  const side = p.wheelType === 'standard' ? 0 : j.x * s.vSide;
-  const fwd = j.y * s.vFwd;
-  const turn = p.wheelType === 'standard' ? j.x * s.vTurn : rotate * s.vTurn;
+  const d = joystickDirection(normalizeJoystick(joystick.x, joystick.y));
+  const side = p.wheelType === 'standard' ? 0 : d.x;
+  const fwd = d.y;
+  const turn = p.wheelType === 'standard' ? d.x + rotate : rotate;
+  const raw = Object.fromEntries(
+    WHEEL_IDS.map((w) => [w, p.matrix.side[w] * side + p.matrix.fwd[w] * fwd + p.matrix.turn[w] * turn]),
+  ) as Record<WheelId, number>;
+  const peak = Math.max(1, ...WHEEL_IDS.map((w) => Math.abs(raw[w])));
+  const pwm = levelPwm(level, noPwmPin);
   return applyMotorLimits(
     Object.fromEntries(
       WHEEL_IDS.map((w) => {
         const m = p.motors[w];
-        const v = (p.matrix.side[w] * side + p.matrix.fwd[w] * fwd + p.matrix.turn[w] * turn) * (m.compensation / 100);
+        const v = (raw[w] / peak) * pwm * (m.compensation / 100);
         return [w, m.inverted ? -v : v];
       }),
     ) as Record<WheelId, number>,
     p,
   );
-}
-
-export function pwmPercent(pwm: number): number {
-  return Math.round((Math.abs(pwm) / 255) * 100);
 }

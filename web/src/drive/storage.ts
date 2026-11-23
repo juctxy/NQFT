@@ -25,9 +25,7 @@ function migrateLegacy(raw: unknown): DriveSettings {
         createDefaultDriveProfile(`profile-${i + 1}`, `Hồ sơ ${i + 1}`),
         p.mode === 'omni' || p.mode === 'mecanum' ? p.mode : 'standard',
       );
-      const v = typeof p.vMain === 'number' ? p.vMain : 190;
-      const speeds = { vFwd: v, vSide: v, vTurn: typeof p.vSide === 'number' ? p.vSide : v };
-      return { ...base, levels: { slow: speeds, medium: speeds, fast: speeds } };
+      return base; // tốc độ giờ cố định theo mức (Chậm/Vừa/Nhanh), bỏ vMain/vSide cũ
     })
     .filter((p) => p !== null);
   return normalizeDriveSettings({

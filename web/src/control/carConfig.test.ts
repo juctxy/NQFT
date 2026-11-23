@@ -9,8 +9,8 @@ describe('CONFIG v2', () => {
   it('hồ sơ mặc định -> 12 byte, ma trận chưa tùy chỉnh', () => {
     const p = createDefaultDriveProfile('a', 'A');
     const bytes = [...encodeConfig(configFromProfile(p, 'medium'))];
-    // [ver, trim x4, minPwm, invert, turnSpeed(190/255=75%), customMatrix, fwd, side, turn]
-    expect(bytes.slice(0, 9)).toEqual([2, 100, 100, 100, 100, 35, 0, 75, 0]);
+    // [ver, trim x4, minPwm, invert, turnSpeed 100 % (= PWM của mức), customMatrix, fwd, side, turn]
+    expect(bytes.slice(0, 9)).toEqual([2, 100, 100, 100, 100, 35, 0, 100, 0]);
     expect(bytes).toHaveLength(12);
   });
 

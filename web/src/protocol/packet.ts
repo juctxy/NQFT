@@ -3,6 +3,7 @@ import {
   CONFIG_V1_LEN,
   CONFIG_VERSION,
   CONTROL_PACKET_LEN,
+  CONTROL_SPEED_PACKET_LEN,
   TELEMETRY_PACKET_LEN,
   TEST_PACKET_LEN,
   TEST_STOP,
@@ -35,6 +36,11 @@ export interface ControlInput {
   x: number;
   /** bitmask ButtonBit: nút đang giữ (bit 0..7) */
   flags: number;
+  /**
+   * v6: PWM khi tốc độ = 100 % (mức tốc độ đang chọn). Có giá trị -> gói 5 byte;
+   * không có -> gói 4 byte như cũ (xe cũ).
+   */
+  speedPwm?: number;
 }
 
 export interface Telemetry {
@@ -42,6 +48,10 @@ export interface Telemetry {
   failsafe: boolean;
   lastSeq: number;
   status: number;
+  /** Trong code xe chưa khai báo chân PWM. */
+  noPwmPin: boolean;
+  /** Xe hiểu byte speedPwm (firmware từ 0.3.0). */
+  speedPwm: boolean;
 }
 
 export const NEUTRAL_INPUT: ControlInput = { y: 0, x: 0, flags: 0 };
@@ -52,12 +62,14 @@ function clampAxis(v: number): number {
 }
 
 export function encodeControl(seq: number, input: ControlInput): Uint8Array<ArrayBuffer> {
-  const buf = new Uint8Array(new ArrayBuffer(CONTROL_PACKET_LEN));
+  const withSpeed = input.speedPwm !== undefined;
+  const buf = new Uint8Array(new ArrayBuffer(withSpeed ? CONTROL_SPEED_PACKET_LEN : CONTROL_PACKET_LEN));
   const view = new DataView(buf.buffer);
   view.setUint8(0, seq & 0xff);
   view.setInt8(1, clampAxis(input.y));
   view.setInt8(2, clampAxis(input.x));
   view.setUint8(3, input.flags & 0xff);
+  if (withSpeed) view.setUint8(4, clampByte(input.speedPwm ?? 255, 255) || 255);
   return buf;
 }
 
@@ -127,5 +139,7 @@ export function decodeTelemetry(view: DataView): Telemetry | null {
     status,
     failsafe: (status & TelemetryStatus.Failsafe) !== 0,
     lastSeq: view.getUint8(3),
+    noPwmPin: (status & TelemetryStatus.NoPwmPin) !== 0,
+    speedPwm: (status & TelemetryStatus.SpeedPwm) !== 0,
   };
 }

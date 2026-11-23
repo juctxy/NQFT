@@ -68,6 +68,12 @@ public:
   bool isConnected() const { return _connected; }
   bool isFailsafe() const { return _failsafe; }
 
+  // PWM của mức tốc độ đang chọn trên web (Chậm 140 / Vừa 200 / Nhanh 255) = PWM khi tốc độ 100 %.
+  // Web chỉ gửi HƯỚNG (x, y = ±100); tốc độ thật do mức này quyết định. Chưa có web: 255.
+  uint8_t speedPwm() const { return _speedPwmApplied; }
+  // false = có bánh L298N khai báo không có chân PWM -> web ẩn mức Chậm/Vừa/Nhanh.
+  bool hasPwmPins() const;
+
   void onConnect(Callback cb) { _onConnect = cb; }
   void onDisconnect(Callback cb) { _onDisconnect = cb; }
 
@@ -174,6 +180,7 @@ private:
   std::atomic<uint32_t> _packet{0};
   std::atomic<uint32_t> _packetMs{0};
   std::atomic<bool> _hasPacket{false};
+  std::atomic<uint8_t> _speedPwm{255};
   std::atomic<bool> _connectedRaw{false};
   uint8_t _cfgPending[WUD_CONFIG_PACKET_LEN] = {0};
   size_t _cfgPendingLen = 0;
@@ -199,6 +206,7 @@ private:
   float _batRatio = 1.0f;
   Print* _log;
   bool _debugMode = true;
+  uint8_t _speedPwmApplied = 255;
   uint32_t _lastLogMs = 0;
   uint32_t _lastTelemetryMs = 0;
   bool _warnedStrafe = false;

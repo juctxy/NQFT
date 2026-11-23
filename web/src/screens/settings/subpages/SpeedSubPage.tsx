@@ -1,76 +1,50 @@
 import { theme } from '../theme';
-import {
-  SPEED_LEVEL_LABELS,
-  SPEED_LEVELS,
-  type DriveProfile,
-  type LevelSpeeds,
-  type SpeedLevel,
-} from '../../../drive/driveModel';
-import { DarkSpeedSetting } from '../sharedControls';
+import { LEVEL_PWM, SPEED_LEVEL_LABELS, SPEED_LEVELS, type SpeedLevel } from '../../../drive/driveModel';
 import { Pressable, Text, View, type Style } from '../../../ui/rn';
 
-const SPEED_LABELS: Record<keyof LevelSpeeds, string> = {
-  vFwd: 'Tiến / lùi (V_fwd)',
-  vSide: 'Di chuyển ngang (V_side)',
-  vTurn: 'Quay tại chỗ (V_turn)',
-};
-
 interface SpeedSubPageProps {
-  profile: DriveProfile;
   level: SpeedLevel;
-  onUpdate: (p: DriveProfile) => void;
   onSelectLevel: (l: SpeedLevel) => void;
+  /** Xe báo trong code chưa khai báo chân PWM -> không có mức tốc độ. */
+  noPwmPin?: boolean;
 }
 
-export function SpeedSubPage({
-  profile,
-  level,
-  onUpdate,
-  onSelectLevel,
-}: SpeedSubPageProps) {
+/** Mức tốc độ: PWM cố định cho từng mức, joystick chỉ chọn hướng. */
+export function SpeedSubPage({ level, onSelectLevel, noPwmPin = false }: SpeedSubPageProps) {
   return (
     <View style={s.container}>
       <View style={s.sectionCard}>
         <Text style={s.sectionTitle}>Mức tốc độ</Text>
-        <View style={s.levelOptions}>
-          {SPEED_LEVELS.map((l) => (
-            <Pressable
-              key={l}
-              selected={level === l}
-              onPress={() => onSelectLevel(l)}
-              style={[s.levelButton, level === l && s.levelButtonSelected]}
-            >
-              <Text style={[s.levelText, level === l && s.levelTextSelected]}>
-                {SPEED_LEVEL_LABELS[l]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={s.hintText}>
-          Mỗi mức lưu riêng tốc độ từng trục (chỉ nhận số nguyên PWM 0–255).
-        </Text>
-
-        <View style={s.speedList}>
-          {(['vFwd', 'vSide', 'vTurn'] as const)
-            .filter((k) => k !== 'vSide' || profile.wheelType !== 'standard')
-            .map((k) => (
-              <DarkSpeedSetting
-                key={`${level}-${k}`}
-                label={SPEED_LABELS[k]}
-                value={profile.levels[level][k]}
-                minPwm={profile.minPwm}
-                onChange={(v) =>
-                  onUpdate({
-                    ...profile,
-                    levels: {
-                      ...profile.levels,
-                      [level]: { ...profile.levels[level], [k]: Math.round(v) },
-                    },
-                  })
-                }
-              />
-            ))}
-        </View>
+        {noPwmPin ? (
+          <View style={s.warnBox}>
+            <Text style={s.warnText}>Trong code chưa set up chân PWM</Text>
+            <Text style={s.hintText}>
+              Xe luôn chạy PWM 255. Muốn có Chậm / Vừa / Nhanh: khai báo chân PWM (EN) cho cả 4 bánh, ví dụ
+              Car.wheelFL(32, 33, 25, false), rồi nạp lại code.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={s.levelOptions}>
+              {SPEED_LEVELS.map((l) => (
+                <Pressable
+                  key={l}
+                  label={`Mức tốc độ: ${SPEED_LEVEL_LABELS[l]} (PWM ${LEVEL_PWM[l]})`}
+                  selected={level === l}
+                  onPress={() => onSelectLevel(l)}
+                  style={[s.levelButton, level === l && s.levelButtonSelected]}
+                >
+                  <Text style={[s.levelText, level === l && s.levelTextSelected]}>{SPEED_LEVEL_LABELS[l]}</Text>
+                  <Text style={[s.pwmText, level === l && s.levelTextSelected]}>PWM {LEVEL_PWM[l]}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.hintText}>
+              PWM cố định cho mỗi mức. Joystick chỉ chọn hướng: đẩy nhẹ hay đẩy hết cỡ, xe đều chạy đúng PWM của mức đang chọn
+              (sau đó mới trừ bù công suất từng bánh).
+            </Text>
+          </>
+        )}
       </View>
     </View>
   );
@@ -127,8 +101,24 @@ const s: Record<string, Style> = {
   levelTextSelected: {
     color: theme.accent,
   },
-  speedList: {
-    gap: 10,
-    marginTop: 6,
+  pwmText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontWeight: 600,
+    marginTop: 2,
+  },
+  warnBox: {
+    backgroundColor: theme.backgroundSubtle,
+    borderColor: theme.accent,
+    borderRadius: 8,
+    borderStyle: 'solid',
+    borderWidth: 1,
+    gap: 6,
+    padding: 12,
+  },
+  warnText: {
+    color: theme.accent,
+    fontSize: 14,
+    fontWeight: 800,
   },
 };

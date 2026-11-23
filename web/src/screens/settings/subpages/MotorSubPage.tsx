@@ -9,6 +9,8 @@ import { Pressable, Text, View, type Style } from '../../../ui/rn';
 interface MotorSubPageProps {
   profile: DriveProfile;
   onUpdate: (p: DriveProfile) => void;
+  /** Gạt công tắc Đảo chiều: đang kết nối thì áp dụng xuống xe ngay. */
+  onInvertChange: (wheel: WheelId, inverted: boolean) => void;
   /** Bắt đầu giữ nút KIỂM TRA của 1 bánh. */
   onTestStart: (wheel: WheelId) => void;
   /** Thả nút KIỂM TRA. */
@@ -18,6 +20,7 @@ interface MotorSubPageProps {
 export function MotorSubPage({
   profile,
   onUpdate,
+  onInvertChange,
   onTestStart,
   onTestEnd,
 }: MotorSubPageProps) {
@@ -30,7 +33,7 @@ export function MotorSubPage({
         <Text style={s.sectionTitle}>Kiểm tra từng động cơ & Đảo chiều</Text>
         <Text style={s.hintText}>
           Kê xe lên cho bánh không chạm đất, rồi nhấn giữ KIỂM TRA: bánh đó quay thử theo chiều TIẾN (40 %), thả tay là dừng.
-          Bánh quay ngược thì gạt Đảo chiều rồi thử lại, xong bấm "Lưu vào xe".
+          Bánh quay ngược thì gạt Đảo chiều: khi đang kết nối, xe đổi chiều động cơ ngay (lưu luôn vào xe).
         </Text>
 
         <View style={s.motorGrid}>
@@ -43,15 +46,7 @@ export function MotorSubPage({
                   <Switch
                     label={`Đảo chiều động cơ ${w.toUpperCase()}`}
                     value={profile.motors[w].inverted}
-                    onValueChange={(v) =>
-                      onUpdate({
-                        ...profile,
-                        motors: {
-                          ...profile.motors,
-                          [w]: { ...profile.motors[w], inverted: v },
-                        },
-                      })
-                    }
+                    onValueChange={(v) => onInvertChange(w, v)}
                     trackColor={{ false: theme.border, true: theme.accent }}
                     thumbColor={
                       profile.motors[w].inverted ? '#fff' : theme.textMuted

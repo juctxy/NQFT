@@ -6,10 +6,12 @@
 #include "WUD_Button.h"
 #include "WUD_Wheel.h"
 
+// Chân LED báo trạng thái, tự chọn (không phải tham số):
+// LED_BUILTIN nếu board có định nghĩa, ngược lại GPIO2 (LED trên đa số ESP32 DevKit).
 #if defined(LED_BUILTIN)
-#define WUD_DEFAULT_LED LED_BUILTIN
+#define WUD_LED_PIN LED_BUILTIN
 #else
-#define WUD_DEFAULT_LED -1
+#define WUD_LED_PIN 2
 #endif
 
 class NimBLECharacteristic;
@@ -39,6 +41,8 @@ struct WUD_Config {
   uint8_t minPwm;      // PWM tối thiểu khi bánh đang quay: 0..255
   uint8_t invertMask;  // đảo chiều: bit 0..3 = FL, FR, BL, BR
   uint8_t turnSpeed;   // tốc độ xoay khi giữ nút quẹo: 0..100 %
+  bool customMatrix;   // true = drive() dùng matrix bên dưới thay công thức có sẵn
+  int8_t matrix[3][4]; // [Tiến, Ngang, Xoay][FL, FR, BL, BR]: -1, 0 hoặc 1
 };
 
 class WUD_Car {
@@ -53,10 +57,12 @@ public:
   // Sai định dạng -> trả false, giữ tên mặc định (4 ký tự hex từ MAC).
   bool setName(const char* code);
 
-  // Bật BLE và phát sóng. LED: nháy chậm = chờ kết nối, sáng = đã kết nối,
-  // nháy nhanh = failsafe. ledPin = -1 để không dùng LED.
-  // Mặc định LED_BUILTIN nếu board có định nghĩa; "ESP32 Dev Module" không có -> nên truyền 2.
-  bool begin(int ledPin = WUD_DEFAULT_LED);
+  // Bật BLE và phát sóng. LED ở WUD_LED_PIN tự chớp theo trạng thái:
+  // nháy chậm = chờ kết nối, nháy nhanh = failsafe, sáng liên tục = đang điều khiển.
+  // debugMode (không bắt buộc): 1 (mặc định) = in dữ liệu tay cầm gửi tới ([CMD], [BTN])
+  // ra Serial; 0 = không in các dòng đó (log kết nối, failsafe, lỗi vẫn in).
+  // Ví dụ: Car.begin();  Car.begin(0);
+  bool begin(bool debugMode = true);
 
   const char* name() const { return _name; }
   bool isConnected() const { return _connected; }
@@ -86,12 +92,19 @@ public:
 
   // ===== 4. Bánh xe =====
 
-  // Driver L298N: in1, in2 = chân chiều quay; en = chân PWM (-1 nếu cắm jumper ENA/ENB).
-  // reverse = true nếu bánh quay ngược khi chạy tiến.
+  // Driver L298N: in1, in2 = chân chiều quay; en = chân PWM ENA/ENB (không bắt buộc).
+  // reverse = true nếu bánh quay ngược khi chạy tiến, false nếu quay đúng.
+  //   Có chân PWM:   Car.wheelFL(32, 33, 25, false);
+  //   Không có PWM:  Car.wheelFL(32, 33, false);   // vẫn cắm jumper ENA/ENB
+  // Chân PWM: hoặc khai báo cho CẢ 4 bánh, hoặc KHÔNG bánh nào. Trộn lẫn -> begin() báo lỗi.
   WUD_Wheel& wheelFL(int in1, int in2, int en, bool reverse = false);
   WUD_Wheel& wheelFR(int in1, int in2, int en, bool reverse = false);
   WUD_Wheel& wheelBL(int in1, int in2, int en, bool reverse = false);
   WUD_Wheel& wheelBR(int in1, int in2, int en, bool reverse = false);
+  WUD_Wheel& wheelFL(int in1, int in2, bool reverse = false);
+  WUD_Wheel& wheelFR(int in1, int in2, bool reverse = false);
+  WUD_Wheel& wheelBL(int in1, int in2, bool reverse = false);
+  WUD_Wheel& wheelBR(int in1, int in2, bool reverse = false);
 
   // Driver khác (tự viết, kế thừa WUD_MotorDriver). driver phải tồn tại suốt chương trình.
   WUD_Wheel& wheelFL(WUD_MotorDriver& driver, bool reverse = false);
@@ -131,11 +144,14 @@ public:
   void setBatteryPin(int pin, float ratio) { _batPin = pin; _batRatio = ratio; }
   // Nơi in log. Mặc định Serial; nullptr = tắt log.
   void setLog(Print* out) { _log = out; }
+  // DebugMode đặt trong begin(); true = đang in dữ liệu nhận được.
+  bool debugMode() const { return _debugMode; }
 
   // ----- Nội bộ: gọi từ task BLE, người dùng không gọi -----
   void _bleConnected(bool on);
   void _bleControl(const uint8_t* data, size_t len);
   void _bleConfig(const uint8_t* data, size_t len);
+  void _bleTest(const uint8_t* data, size_t len);
 
 private:
   WUD_Wheel& attachL298N(WUD_WheelId id, int in1, int in2, int en, bool reverse);
@@ -143,6 +159,8 @@ private:
   void applySignal(const WUD_Signal& s);
   void enterFailsafe(WUD_StopReason reason);
   void processConfig();
+  void processTest(uint32_t now);
+  void setWheels(int fl, int fr, int bl, int br);
   void applyConfig();
   void loadConfig();
   void saveConfig();
@@ -150,6 +168,7 @@ private:
   void updateLed(uint32_t now);
   uint16_t readBatteryMv();
   void logf(const char* fmt, ...);
+  bool checkPwmPins();
 
   // Trạng thái dùng chung giữa task BLE và loop().
   std::atomic<uint32_t> _packet{0};
@@ -157,7 +176,13 @@ private:
   std::atomic<bool> _hasPacket{false};
   std::atomic<bool> _connectedRaw{false};
   uint8_t _cfgPending[WUD_CONFIG_PACKET_LEN] = {0};
+  size_t _cfgPendingLen = 0;
   bool _cfgHasPending = false;
+  std::atomic<uint16_t> _testPacket{WUD_TEST_STOP};  // byte thấp = bánh, byte cao = tốc độ
+  std::atomic<uint32_t> _testMs{0};
+  std::atomic<bool> _hasTest{false};
+  bool _testing = false;      // đang chạy thử 1 bánh từ web -> bỏ qua drive()/stop() của sketch
+  uint8_t _testWheel = WUD_TEST_STOP;
 
   // Trạng thái trong loop().
   WUD_Signal _sig = {0, 0, 0, 0};
@@ -173,9 +198,11 @@ private:
   int _batPin = -1;
   float _batRatio = 1.0f;
   Print* _log;
+  bool _debugMode = true;
   uint32_t _lastLogMs = 0;
   uint32_t _lastTelemetryMs = 0;
   bool _warnedStrafe = false;
+  int8_t _wheelPwm[4] = {-1, -1, -1, -1};  // 1 = có chân PWM, 0 = không, -1 = driver khác / chưa gắn
 
   WUD_DriveType _type = WUD_STD;
   WUD_Wheel _wheels[4];

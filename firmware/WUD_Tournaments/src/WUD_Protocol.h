@@ -1,22 +1,26 @@
 #pragma once
-// Giao thức BLE v4 — đồng bộ với web/src/protocol/constants.ts và docs/protocol.md.
+// Giao thức BLE v5 — đồng bộ với web/src/protocol/constants.ts và docs/protocol.md.
 // Đổi bất kỳ giá trị nào ở đây thì phải đổi cả bên web.
 
 #include <stdint.h>
 
-#define WUD_PROTOCOL_VERSION 4
+#define WUD_PROTOCOL_VERSION 5
 
 #define WUD_SERVICE_UUID         "6e3a0001-8f5c-4b7a-9d2e-3c1f0a7b5e10"
 #define WUD_CONTROL_CHAR_UUID    "6e3a0002-8f5c-4b7a-9d2e-3c1f0a7b5e10"
 #define WUD_TELEMETRY_CHAR_UUID  "6e3a0003-8f5c-4b7a-9d2e-3c1f0a7b5e10"
 #define WUD_CONFIG_CHAR_UUID     "6e3a0004-8f5c-4b7a-9d2e-3c1f0a7b5e10"
+#define WUD_TEST_CHAR_UUID       "6e3a0005-8f5c-4b7a-9d2e-3c1f0a7b5e10"
 
 #define WUD_DEVICE_NAME_PREFIX   "RC-Car-"
 
 constexpr uint8_t WUD_CONTROL_PACKET_LEN   = 4;  // [seq, y, x, flags]
 constexpr uint8_t WUD_TELEMETRY_PACKET_LEN = 4;  // [mV lo, mV hi, status, lastSeq]
-constexpr uint8_t WUD_CONFIG_PACKET_LEN    = 8;  // xem WUD_Config
-constexpr uint8_t WUD_CONFIG_VERSION       = 1;
+constexpr uint8_t WUD_CONFIG_PACKET_LEN    = 12; // v2, xem WUD_Config (v1 cũ = 8 byte, vẫn đọc được)
+constexpr uint8_t WUD_CONFIG_V1_LEN        = 8;
+constexpr uint8_t WUD_CONFIG_VERSION       = 2;
+constexpr uint8_t WUD_TEST_PACKET_LEN      = 2;  // [bánh 0..3 hoặc 0xFF = dừng, tốc độ int8 -100..100]
+constexpr uint8_t WUD_TEST_STOP            = 0xFF;
 
 // Byte flags: mỗi bit = 1 nút đang giữ.
 constexpr uint8_t WUD_BIT_FUNC1      = 1 << 0;  // nút giữa

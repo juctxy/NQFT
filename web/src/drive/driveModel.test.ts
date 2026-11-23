@@ -30,4 +30,10 @@ describe('driveModel', () => {
     const m = mixDrive(setDriveWheelType(p, 'mecanum'), 'medium', { x: 1, y: 0 }, 0);
     expect(m).toEqual({ fl: 190, fr: -190, rl: -190, rr: 190 });
   });
+
+  it('mixDrive: neutral input stops every wheel and reverse input produces negative PWM', () => {
+    const p = createDefaultDriveProfile('a', 'A');
+    expect(mixDrive(p, 'medium', { x: 0, y: 0 }, 0)).toEqual({ fl: 0, fr: 0, rl: 0, rr: 0 });
+    expect(mixDrive(p, 'medium', { x: 0, y: -1 }, 0)).toEqual({ fl: -190, fr: -190, rl: -190, rr: -190 });
+  });
 });

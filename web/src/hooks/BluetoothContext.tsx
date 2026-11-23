@@ -2,6 +2,7 @@
 // theo cùng mô hình với BluetoothProvider của NQFT, nhưng chạy trên BleTransport của app này.
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ControlLoop } from '../control/ControlLoop';
+import type { CarConfig } from '../protocol/packet';
 import { useCar } from './useCar';
 
 export interface NearbyDevice {
@@ -24,6 +25,15 @@ export interface BluetoothValue {
   controlLoop: ControlLoop;
   /** Đổi mỗi khi trạng thái kết nối đổi — dùng để gửi lại lệnh sau khi kết nối lại. */
   connectionKey: string;
+  /** Ô CONFIG đọc từ xe lúc kết nối / sau khi lưu; null = chưa đọc được. */
+  carConfig: CarConfig | null;
+  /** Xe có ô CONFIG (lưu cấu hình) / ô TEST (chạy thử từng bánh) không. */
+  configSupported: boolean;
+  testSupported: boolean;
+  /** Ghi CONFIG xuống xe rồi đọc lại; trả cấu hình xe đang dùng. */
+  saveConfig: (config: CarConfig) => Promise<CarConfig | null>;
+  /** Chạy thử 1 bánh: wheel 0..3 = FL, FR, BL, BR; null = dừng. */
+  sendTest: (wheel: number | null, speed: number) => boolean;
 }
 
 export function nearbyDeviceName(d: NearbyDevice): string {
@@ -89,8 +99,17 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       disconnect: car.disconnect,
       controlLoop: car.controlLoop,
       connectionKey: state,
+      carConfig: car.carConfig,
+      configSupported: car.configSupported,
+      testSupported: car.testSupported,
+      saveConfig: car.saveConfig,
+      sendTest: car.sendTest,
     }),
-    [devices, connectedDevice, isScanning, state, error, battery, scan, stopScan, connect, car.disconnect, car.controlLoop],
+    [
+      devices, connectedDevice, isScanning, state, error, battery, scan, stopScan, connect,
+      car.disconnect, car.controlLoop, car.carConfig, car.configSupported, car.testSupported,
+      car.saveConfig, car.sendTest,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -1,4 +1,4 @@
-import type { Telemetry } from '../protocol/packet';
+import type { CarConfig, Telemetry } from '../protocol/packet';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -35,4 +35,13 @@ export interface Transport {
   getStatus(): TransportStatus;
   onStatusChange(cb: (s: TransportStatus) => void): () => void;
   onTelemetry(cb: (t: Telemetry) => void): () => void;
+  /** Xe có ô CONFIG / ô TEST không (firmware cũ có thể thiếu). Chỉ đúng khi đã kết nối. */
+  hasConfig(): boolean;
+  hasTest(): boolean;
+  /** Đọc ô CONFIG hiện tại của xe; null nếu xe không có hoặc lỗi. */
+  readConfig(): Promise<CarConfig | null>;
+  /** Ghi ô CONFIG (xe lưu vào flash). Lỗi -> throw. */
+  writeConfig(config: CarConfig): Promise<void>;
+  /** Gửi 1 gói chạy thử: wheel 0..3 = FL, FR, BL, BR; null = dừng. */
+  sendTest(wheel: number | null, speed: number): boolean;
 }

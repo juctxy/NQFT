@@ -16,6 +16,7 @@ WUD_Car Car;
 namespace {
 
 constexpr uint32_t FAILSAFE_TIMEOUT_MS   = 500;
+constexpr uint32_t TEST_TIMEOUT_MS       = 300;  // web gửi gói TEST mỗi 100 ms khi giữ nút
 constexpr uint32_t TELEMETRY_INTERVAL_MS = 500;
 constexpr uint32_t LOG_INTERVAL_MS       = 200;  // giới hạn tần suất log [CMD]
 constexpr uint32_t LED_SLOW_MS           = 500;  // chờ kết nối
@@ -30,7 +31,8 @@ constexpr uint16_t CONN_TIMEOUT      = 200;  // 2 s
 constexpr const char* PREFS_NS  = "wud";
 constexpr const char* PREFS_KEY = "cfg";
 
-constexpr WUD_Config DEFAULT_CONFIG = {{100, 100, 100, 100}, 0, 0, 50};
+constexpr WUD_Config DEFAULT_CONFIG = {{100, 100, 100, 100}, 0, 0, 50, false, {{0}}};
+const char* const WHEEL_NAMES[4] = {"FL", "FR", "BL", "BR"};
 
 const char* const BUTTON_NAMES[8] = {"FUNC1", "FUNC2",    "SQUARE",    "CIRCLE",
                                      "TRIANGLE", "CROSS", "TURN_LEFT", "TURN_RIGHT"};
@@ -51,16 +53,41 @@ const char* buttonList(uint8_t mask, char* buf, size_t len) {
   return n ? buf : "-";
 }
 
+// 1 byte = dấu của 4 bánh, mỗi bánh 2 bit (FL = bit 0..1, ... BR = bit 6..7): 0 = 0, 1 = +1, 3 = -1.
+uint8_t packSigns(const int8_t* m) {
+  uint8_t b = 0;
+  for (int i = 0; i < 4; i++) b |= (m[i] > 0 ? 1 : (m[i] < 0 ? 3 : 0)) << (2 * i);
+  return b;
+}
+
+void unpackSigns(uint8_t b, int8_t* m) {
+  for (int i = 0; i < 4; i++) {
+    uint8_t code = (b >> (2 * i)) & 3;
+    m[i] = code == 1 ? 1 : (code == 3 ? -1 : 0);
+  }
+}
+
 void encodeConfig(const WUD_Config& c, uint8_t* out) {
   out[0] = WUD_CONFIG_VERSION;
   for (int i = 0; i < 4; i++) out[1 + i] = c.trim[i];
   out[5] = c.minPwm;
   out[6] = c.invertMask;
   out[7] = c.turnSpeed;
+  out[8] = c.customMatrix ? 1 : 0;
+  for (int a = 0; a < 3; a++) out[9 + a] = packSigns(c.matrix[a]);
 }
 
-bool decodeConfig(const uint8_t* in, WUD_Config& c) {
-  if (in[0] != WUD_CONFIG_VERSION) return false;
+// Nhận cả v1 (8 byte, không có ma trận) và v2 (12 byte).
+bool decodeConfig(const uint8_t* in, size_t len, WUD_Config& c) {
+  if (len < WUD_CONFIG_V1_LEN) return false;
+  if (in[0] == 1) {
+    c.customMatrix = false;
+  } else if (in[0] == 2 && len >= WUD_CONFIG_PACKET_LEN) {
+    c.customMatrix = in[8] & 1;
+    for (int a = 0; a < 3; a++) unpackSigns(in[9 + a], c.matrix[a]);
+  } else {
+    return false;
+  }
   for (int i = 0; i < 4; i++) c.trim[i] = in[1 + i] > 100 ? 100 : in[1 + i];
   c.minPwm = in[5];
   c.invertMask = in[6] & 0x0F;
@@ -103,6 +130,18 @@ public:
   void onWrite(NimBLECharacteristic* chr, NimBLEConnInfo&) override {
     NimBLEAttValue v = chr->getValue();
     _car->_bleConfig(v.data(), v.length());
+  }
+
+private:
+  WUD_Car* _car;
+};
+
+class TestCallbacks : public NimBLECharacteristicCallbacks {
+public:
+  explicit TestCallbacks(WUD_Car* car) : _car(car) {}
+  void onWrite(NimBLECharacteristic* chr, NimBLEConnInfo&) override {
+    NimBLEAttValue v = chr->getValue();
+    _car->_bleTest(v.data(), v.length());
   }
 
 private:
@@ -166,10 +205,12 @@ bool WUD_Car::setName(const char* code) {
   return true;
 }
 
-bool WUD_Car::begin(int ledPin) {
+bool WUD_Car::begin(bool debugMode) {
+  _debugMode = debugMode;
   if (_begun) return true;
+  if (!checkPwmPins()) return false;
 
-  _ledPin = ledPin;
+  _ledPin = WUD_LED_PIN;
   if (_ledPin >= 0) {
     pinMode(_ledPin, OUTPUT);
     digitalWrite(_ledPin, LOW);
@@ -206,6 +247,10 @@ bool WUD_Car::begin(int ledPin) {
   _configChar = service->createCharacteristic(
       WUD_CONFIG_CHAR_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   _configChar->setCallbacks(new ConfigCallbacks(this));
+
+  NimBLECharacteristic* test = service->createCharacteristic(
+      WUD_TEST_CHAR_UUID, NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE);
+  test->setCallbacks(new TestCallbacks(this));
   uint8_t cfg[WUD_CONFIG_PACKET_LEN];
   encodeConfig(_cfg, cfg);
   _configChar->setValue(cfg, sizeof(cfg));
@@ -245,11 +290,20 @@ void WUD_Car::_bleControl(const uint8_t* d, size_t len) {
 }
 
 void WUD_Car::_bleConfig(const uint8_t* d, size_t len) {
-  if (len < WUD_CONFIG_PACKET_LEN) return;
+  if (len < WUD_CONFIG_V1_LEN) return;
+  if (len > WUD_CONFIG_PACKET_LEN) len = WUD_CONFIG_PACKET_LEN;
   portENTER_CRITICAL(&g_cfgMux);
-  memcpy(_cfgPending, d, WUD_CONFIG_PACKET_LEN);
+  memcpy(_cfgPending, d, len);
+  _cfgPendingLen = len;
   _cfgHasPending = true;
   portEXIT_CRITICAL(&g_cfgMux);
+}
+
+void WUD_Car::_bleTest(const uint8_t* d, size_t len) {
+  if (len < WUD_TEST_PACKET_LEN) return;
+  _testPacket = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
+  _testMs = millis();
+  _hasTest = true;
 }
 
 // ----------------------------------------------------------------------------
@@ -298,11 +352,45 @@ void WUD_Car::update() {
     enterFailsafe(WUD_StopReason::Timeout);
   }
 
+  processTest(now);
+
   if (_connected && now - _lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
     _lastTelemetryMs = now;
     sendTelemetry(now);
   }
   updateLed(now);
+}
+
+// Chạy thử 1 bánh (nút KIỂM TRA trên web). Trong lúc chạy thử, drive()/stop() của sketch bị bỏ qua.
+// Hết gói TEST quá TEST_TIMEOUT_MS, nhận 0xFF hoặc mất kết nối -> dừng cả 4 bánh.
+void WUD_Car::processTest(uint32_t now) {
+  uint8_t wheel = WUD_TEST_STOP;
+  int speed = 0;
+  if (_connected && _hasTest) {
+    uint32_t lastMs = _testMs;
+    uint32_t elapsed = (int32_t)(now - lastMs) > 0 ? now - lastMs : 0;
+    uint16_t p = _testPacket;
+    if (elapsed <= TEST_TIMEOUT_MS) {
+      wheel = p & 0xFF;
+      speed = clamp100((int8_t)(p >> 8));
+    }
+  }
+
+  if (wheel < 4) {
+    if (!_testing || wheel != _testWheel) logf("[TEST] Chay thu banh %s, toc do %d\n", WHEEL_NAMES[wheel], speed);
+    _testing = true;
+    _testWheel = wheel;
+    for (int i = 0; i < 4; i++) {
+      if (i == wheel) _wheels[i].test(speed);
+      else _wheels[i].stop();
+    }
+  } else if (_testing) {
+    _testing = false;
+    _testWheel = WUD_TEST_STOP;
+    _hasTest = false;
+    for (auto& w : _wheels) w.stop();
+    logf("[TEST] Dung chay thu\n");
+  }
 }
 
 // So với tín hiệu trước: chỉ báo thay đổi khi x, y hoặc nút khác đi (seq không tính).
@@ -316,15 +404,17 @@ void WUD_Car::applySignal(const WUD_Signal& s) {
   _releasedEdges = oldFlags & ~s.flags;  // 1 -> 0
   _changed = true;
 
-  char a[64], b[64];
-  if (_pressedEdges || _releasedEdges) {
-    logf("[BTN] nhan=%s tha=%s\n", buttonList(_pressedEdges, a, sizeof a),
-         buttonList(_releasedEdges, b, sizeof b));
-  }
-  uint32_t now = millis();
-  if (now - _lastLogMs >= LOG_INTERVAL_MS) {
-    _lastLogMs = now;
-    logf("[CMD] seq=%3u x=%4d y=%4d btn=%s\n", s.seq, s.x, s.y, buttonList(s.flags, a, sizeof a));
+  if (_debugMode) {  // DebugMode = 0 -> không in dữ liệu nhận được
+    char a[64], b[64];
+    if (_pressedEdges || _releasedEdges) {
+      logf("[BTN] nhan=%s tha=%s\n", buttonList(_pressedEdges, a, sizeof a),
+           buttonList(_releasedEdges, b, sizeof b));
+    }
+    uint32_t now = millis();
+    if (now - _lastLogMs >= LOG_INTERVAL_MS) {
+      _lastLogMs = now;
+      logf("[CMD] seq=%3u x=%4d y=%4d btn=%s\n", s.seq, s.x, s.y, buttonList(s.flags, a, sizeof a));
+    }
   }
   if (_onChange) _onChange();
 }
@@ -350,18 +440,40 @@ void WUD_Car::enterFailsafe(WUD_StopReason reason) {
 
 WUD_Wheel& WUD_Car::attachL298N(WUD_WheelId id, int in1, int in2, int en, bool reverse) {
   _wheels[id].attach(new WUD_L298N(in1, in2, en), reverse, true);
+  _wheelPwm[id] = en >= 0 ? 1 : 0;
   return _wheels[id];
 }
 
 WUD_Wheel& WUD_Car::attachDriver(WUD_WheelId id, WUD_MotorDriver& driver, bool reverse) {
   _wheels[id].attach(&driver, reverse, false);
+  _wheelPwm[id] = -1;
   return _wheels[id];
+}
+
+// Chân PWM phải có ở cả 4 bánh L298N hoặc không bánh nào.
+bool WUD_Car::checkPwmPins() {
+  bool withPwm = false, withoutPwm = false;
+  for (int8_t p : _wheelPwm) {
+    if (p == 1) withPwm = true;
+    if (p == 0) withoutPwm = true;
+  }
+  if (withPwm && withoutPwm) {
+    logf("[WHEEL] Loi: chan PWM phai khai bao cho ca 4 banh hoac khong banh nao\n");
+    return false;
+  }
+  return true;
 }
 
 WUD_Wheel& WUD_Car::wheelFL(int a, int b, int en, bool r) { return attachL298N(WUD_FL, a, b, en, r); }
 WUD_Wheel& WUD_Car::wheelFR(int a, int b, int en, bool r) { return attachL298N(WUD_FR, a, b, en, r); }
 WUD_Wheel& WUD_Car::wheelBL(int a, int b, int en, bool r) { return attachL298N(WUD_BL, a, b, en, r); }
 WUD_Wheel& WUD_Car::wheelBR(int a, int b, int en, bool r) { return attachL298N(WUD_BR, a, b, en, r); }
+
+// Không có chân PWM (cắm jumper ENA/ENB).
+WUD_Wheel& WUD_Car::wheelFL(int a, int b, bool r) { return attachL298N(WUD_FL, a, b, -1, r); }
+WUD_Wheel& WUD_Car::wheelFR(int a, int b, bool r) { return attachL298N(WUD_FR, a, b, -1, r); }
+WUD_Wheel& WUD_Car::wheelBL(int a, int b, bool r) { return attachL298N(WUD_BL, a, b, -1, r); }
+WUD_Wheel& WUD_Car::wheelBR(int a, int b, bool r) { return attachL298N(WUD_BR, a, b, -1, r); }
 
 WUD_Wheel& WUD_Car::wheelFL(WUD_MotorDriver& d, bool r) { return attachDriver(WUD_FL, d, r); }
 WUD_Wheel& WUD_Car::wheelFR(WUD_MotorDriver& d, bool r) { return attachDriver(WUD_FR, d, r); }
@@ -372,12 +484,26 @@ WUD_Wheel& WUD_Car::wheelBR(WUD_MotorDriver& d, bool r) { return attachDriver(WU
 // 5. Chạy xe
 
 void WUD_Car::drive(int x, int y, int turn) {
+  if (_testing) return;  // web đang chạy thử 1 bánh
   x = clamp100(x);
   y = clamp100(y);
   turn = clamp100(turn);
 
   int fl, fr, bl, br;
-  if (_type == WUD_STD) {
+  if (_cfg.customMatrix) {
+    // Ma trận hướng gửi từ web: mỗi bánh = dấuTiến*y + dấuNgang*ngang + dấuXoay*xoay.
+    // Xe STD không đi ngang: Ox là rẽ, cộng vào xoay.
+    int side = (_type == WUD_STD) ? 0 : x;
+    int rot = (_type == WUD_STD) ? x + turn : turn;
+    int v[4];
+    for (int i = 0; i < 4; i++) {
+      v[i] = _cfg.matrix[0][i] * y + _cfg.matrix[1][i] * side + _cfg.matrix[2][i] * rot;
+    }
+    fl = v[0];
+    fr = v[1];
+    bl = v[2];
+    br = v[3];
+  } else if (_type == WUD_STD) {
     // Xe 2 bên: Ox là rẽ, cộng với xoay.
     int left = y + x + turn;
     int right = y - x - turn;
@@ -400,6 +526,10 @@ void WUD_Car::drive(int x, int y, int turn) {
     br = br * 100 / peak;
   }
 
+  setWheels(fl, fr, bl, br);
+}
+
+void WUD_Car::setWheels(int fl, int fr, int bl, int br) {
   _wheels[WUD_FL].setSpeed(fl);
   _wheels[WUD_FR].setSpeed(fr);
   _wheels[WUD_BL].setSpeed(bl);
@@ -443,6 +573,7 @@ bool WUD_Car::goRight(int speed) {
 }
 
 void WUD_Car::stop() {
+  if (_testing) return;  // web đang chạy thử 1 bánh, processTest() tự dừng khi xong
   for (auto& w : _wheels) w.stop();
 }
 
@@ -451,16 +582,20 @@ void WUD_Car::stop() {
 
 void WUD_Car::processConfig() {
   uint8_t raw[WUD_CONFIG_PACKET_LEN];
+  size_t len = 0;
   bool has;
   portENTER_CRITICAL(&g_cfgMux);
   has = _cfgHasPending;
-  if (has) memcpy(raw, _cfgPending, sizeof(raw));
+  if (has) {
+    memcpy(raw, _cfgPending, sizeof(raw));
+    len = _cfgPendingLen;
+  }
   _cfgHasPending = false;
   portEXIT_CRITICAL(&g_cfgMux);
   if (!has) return;
 
-  WUD_Config c;
-  if (!decodeConfig(raw, c)) {
+  WUD_Config c = _cfg;
+  if (!decodeConfig(raw, len, c)) {
     logf("[CFG] Bo qua: phien ban cau hinh %u khong ho tro\n", raw[0]);
     return;
   }
@@ -470,8 +605,9 @@ void WUD_Car::processConfig() {
   uint8_t out[WUD_CONFIG_PACKET_LEN];
   encodeConfig(_cfg, out);
   if (_configChar) _configChar->setValue(out, sizeof(out));
-  logf("[CFG] trim FL=%u FR=%u BL=%u BR=%u minPwm=%u dao=0x%X xoay=%u\n", _cfg.trim[0],
-       _cfg.trim[1], _cfg.trim[2], _cfg.trim[3], _cfg.minPwm, _cfg.invertMask, _cfg.turnSpeed);
+  logf("[CFG] trim FL=%u FR=%u BL=%u BR=%u minPwm=%u dao=0x%X xoay=%u ma tran=%s\n", _cfg.trim[0],
+       _cfg.trim[1], _cfg.trim[2], _cfg.trim[3], _cfg.minPwm, _cfg.invertMask, _cfg.turnSpeed,
+       _cfg.customMatrix ? "tuy chinh" : "mac dinh");
   if (_onConfigChange) _onConfigChange();
 }
 
@@ -485,7 +621,10 @@ void WUD_Car::loadConfig() {
   Preferences prefs;
   if (!prefs.begin(PREFS_NS, true)) return;  // chưa có gì trong flash
   uint8_t raw[WUD_CONFIG_PACKET_LEN];
-  if (prefs.getBytes(PREFS_KEY, raw, sizeof(raw)) == sizeof(raw)) decodeConfig(raw, _cfg);
+  size_t n = prefs.getBytesLength(PREFS_KEY);  // 8 byte (v1, bản cũ) hoặc 12 byte (v2)
+  if (n >= WUD_CONFIG_V1_LEN && n <= sizeof(raw) && prefs.getBytes(PREFS_KEY, raw, n) == n) {
+    decodeConfig(raw, n, _cfg);
+  }
   prefs.end();
 }
 

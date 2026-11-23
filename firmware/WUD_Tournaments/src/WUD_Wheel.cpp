@@ -26,14 +26,28 @@ void WUD_Wheel::configure(uint8_t trimPercent, uint8_t minPwm, bool invert) {
 
 void WUD_Wheel::setSpeed(int speed) {
   _speed = constrain(speed, -100, 100);
+  _raw = false;
+  apply();
+}
+
+void WUD_Wheel::test(int speed) {
+  _speed = constrain(speed, -100, 100);
+  _raw = true;
   apply();
 }
 
 void WUD_Wheel::apply() {
   if (!_driver) return;
-  int s = (_reverse != _invert) ? -_speed : _speed;
-  long duty = (long)abs(s) * 255L * _trim / 10000L;
-  if (duty > 0 && duty < _minPwm) duty = _minPwm;
+  long duty;
+  int s;
+  if (_raw) {
+    s = _reverse ? -_speed : _speed;
+    duty = (long)abs(s) * 255L / 100L;
+  } else {
+    s = (_reverse != _invert) ? -_speed : _speed;
+    duty = (long)abs(s) * 255L * _trim / 10000L;
+    if (duty > 0 && duty < _minPwm) duty = _minPwm;
+  }
   if (duty > 255) duty = 255;
   int out = s < 0 ? -(int)duty : (int)duty;
   if (!_dirty && out == _lastDuty) return;  // không ghi lại giá trị cũ

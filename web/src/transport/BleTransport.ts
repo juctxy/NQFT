@@ -1,10 +1,12 @@
 import {
+  CONFIG_CHAR_UUID,
   CONTROL_CHAR_UUID,
   DEVICE_NAME_PREFIX,
   SERVICE_UUID,
   TELEMETRY_CHAR_UUID,
+  TEST_CHAR_UUID,
 } from '../protocol/constants';
-import { decodeTelemetry, type Telemetry } from '../protocol/packet';
+import { decodeConfig, decodeTelemetry, encodeConfig, encodeTest, type CarConfig, type Telemetry } from '../protocol/packet';
 import type { ConnectionState, Transport, TransportErrorCode, TransportStatus } from './Transport';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -23,6 +25,9 @@ export class BleTransport implements Transport {
   private device: BluetoothDevice | null = null;
   private control: BluetoothRemoteGATTCharacteristic | null = null;
   private telemetry: BluetoothRemoteGATTCharacteristic | null = null;
+  private config: BluetoothRemoteGATTCharacteristic | null = null;
+  private test: BluetoothRemoteGATTCharacteristic | null = null;
+  private testWriting = false;
 
   private status: TransportStatus = { state: 'disconnected', deviceName: null, error: null, errorCode: null };
   private statusListeners = new Set<(s: TransportStatus) => void>();
@@ -117,6 +122,43 @@ export class BleTransport implements Transport {
     return true;
   }
 
+  hasConfig(): boolean {
+    return this.config !== null;
+  }
+
+  hasTest(): boolean {
+    return this.test !== null;
+  }
+
+  async readConfig(): Promise<CarConfig | null> {
+    if (!this.config) return null;
+    try {
+      return decodeConfig(await this.config.readValue());
+    } catch (e) {
+      console.warn('[BLE] read CONFIG failed', e);
+      return null;
+    }
+  }
+
+  async writeConfig(config: CarConfig): Promise<void> {
+    if (!this.config || this.status.state !== 'connected') throw new Error('Chưa kết nối xe');
+    await this.config.writeValueWithResponse(encodeConfig(config));
+  }
+
+  sendTest(wheel: number | null, speed: number): boolean {
+    const chr = this.test;
+    if (!chr || this.testWriting || this.status.state !== 'connected') return false;
+    this.testWriting = true;
+    const packet = encodeTest(wheel, speed);
+    const write = chr.writeValueWithoutResponse ? chr.writeValueWithoutResponse(packet) : chr.writeValue(packet);
+    write
+      .catch((e) => console.warn('[BLE] write TEST failed', e))
+      .finally(() => {
+        this.testWriting = false;
+      });
+    return true;
+  }
+
   getStatus(): TransportStatus {
     return this.status;
   }
@@ -143,12 +185,19 @@ export class BleTransport implements Transport {
     const control = await service.getCharacteristic(CONTROL_CHAR_UUID);
     const telemetry = await service.getCharacteristic(TELEMETRY_CHAR_UUID);
 
+    // CONFIG / TEST: firmware cũ (rc_car_ble, WUD_Tournaments 0.1.x) có thể không có.
+    const config = await service.getCharacteristic(CONFIG_CHAR_UUID).catch(() => null);
+    const test = await service.getCharacteristic(TEST_CHAR_UUID).catch(() => null);
+
     telemetry.addEventListener('characteristicvaluechanged', this.handleTelemetry);
     await telemetry.startNotifications();
 
     this.control = control;
     this.telemetry = telemetry;
+    this.config = config;
+    this.test = test;
     this.writing = false;
+    this.testWriting = false;
     this.setStatus({ state: 'connected', error: null, errorCode: null });
     void this.readDeviceName(server);
   }
@@ -215,7 +264,10 @@ export class BleTransport implements Transport {
     this.telemetry?.removeEventListener('characteristicvaluechanged', this.handleTelemetry);
     this.telemetry = null;
     this.control = null;
+    this.config = null;
+    this.test = null;
     this.writing = false;
+    this.testWriting = false;
   }
 
   private detachDevice(): void {

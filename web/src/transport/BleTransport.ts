@@ -185,7 +185,7 @@ export class BleTransport implements Transport {
     const control = await service.getCharacteristic(CONTROL_CHAR_UUID);
     const telemetry = await service.getCharacteristic(TELEMETRY_CHAR_UUID);
 
-    // CONFIG / TEST: firmware cũ (rc_car_ble, WUD_Tournaments 0.1.x) có thể không có.
+    // CONFIG / TEST: firmware cũ (WUD_Tournaments 0.1.x) không có.
     const config = await service.getCharacteristic(CONFIG_CHAR_UUID).catch(() => null);
     const test = await service.getCharacteristic(TEST_CHAR_UUID).catch(() => null);
 

@@ -130,13 +130,14 @@ function HoldButton({
 export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpenInstructions: () => void; onOpenSettings: () => void }) {
   const { driveSettings, activeDriveProfile: profile, driveSettingsReady, selectSpeedLevel } = useController();
   const bt = useBluetooth();
-  const drive = useDriveInput(bt.controlLoop, profile, driveSettings.activeLevel, bt.connectionKey);
+  const drive = useDriveInput(bt.controlLoop, profile, driveSettings.activeLevel, bt.connectionKey, bt.carSpeed);
+  const noPwmPin = Boolean(bt.connectedDevice) && bt.carSpeed.noPwmPin;
   const [joystick, setJoystick] = useState<Vec>({ x: 0, y: 0 });
   const [rotate, setRotate] = useState(0);
   const [pickerVisible, setPickerVisible] = useState(false);
   const viewport = useViewport();
   const scale = 0.96 * Math.min(viewport.width / CANVAS_W, viewport.height / CANVAS_H);
-  const wheelPwm = mixDrive(profile, driveSettings.activeLevel, joystick, rotate);
+  const wheelPwm = mixDrive(profile, driveSettings.activeLevel, joystick, rotate, noPwmPin);
 
   const onJoystickChange = (value: Vec) => {
     setJoystick(value);
@@ -187,6 +188,7 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
             <SpeedPresetSelector
               level={driveSettings.activeLevel}
               wheelPwm={wheelPwm}
+              noPwmPin={noPwmPin}
               ready={driveSettingsReady}
               onSelectLevel={selectSpeedLevel}
             />

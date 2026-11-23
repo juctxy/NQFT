@@ -23,10 +23,22 @@ describe('encodeControl', () => {
   });
 });
 
+describe('gói CONTROL v6 (byte speedPwm)', () => {
+  it('có speedPwm -> 5 byte; không có -> 4 byte như cũ', () => {
+    expect([...encodeControl(1, { y: 100, x: 0, flags: 0, speedPwm: 200 })]).toEqual([1, 100, 0, 0, 200]);
+    expect(encodeControl(1, { y: 100, x: 0, flags: 0 })).toHaveLength(4);
+  });
+});
+
 describe('decodeTelemetry', () => {
+  it('bit 1 = chưa có chân PWM, bit 2 = xe hiểu speedPwm', () => {
+    const t = decodeTelemetry(new DataView(new Uint8Array([0, 0, 0b110, 0]).buffer));
+    expect(t).toMatchObject({ failsafe: false, noPwmPin: true, speedPwm: true });
+  });
+
   it('giải mã little-endian', () => {
     const view = new DataView(new Uint8Array([0xfc, 0x1c, 0x01, 0x2a]).buffer);
-    expect(decodeTelemetry(view)).toEqual({ batteryMv: 7420, status: 1, failsafe: true, lastSeq: 42 });
+    expect(decodeTelemetry(view)).toEqual({ batteryMv: 7420, status: 1, failsafe: true, lastSeq: 42, noPwmPin: false, speedPwm: false });
   });
 
   it('trả null khi gói quá ngắn', () => {

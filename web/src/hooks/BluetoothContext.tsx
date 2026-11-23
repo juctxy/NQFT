@@ -2,6 +2,7 @@
 // theo cùng mô hình với BluetoothProvider của NQFT, nhưng chạy trên BleTransport của app này.
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ControlLoop } from '../control/ControlLoop';
+import { UNKNOWN_CAR, type CarSpeedCaps } from '../control/mapInput';
 import type { CarConfig } from '../protocol/packet';
 import { useCar } from './useCar';
 
@@ -34,6 +35,8 @@ export interface BluetoothValue {
   saveConfig: (config: CarConfig) => Promise<CarConfig | null>;
   /** Chạy thử 1 bánh: wheel 0..3 = FL, FR, BL, BR; null = dừng. */
   sendTest: (wheel: number | null, speed: number) => boolean;
+  /** Xe có hiểu mức tốc độ / có chân PWM không (từ telemetry; chưa kết nối = chưa biết). */
+  carSpeed: CarSpeedCaps;
 }
 
 export function nearbyDeviceName(d: NearbyDevice): string {
@@ -84,6 +87,12 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     [state, deviceName],
   );
   const battery = car.telemetry && car.telemetry.batteryMv > 0 ? car.telemetry.batteryMv : null;
+  const speedPwm = car.telemetry?.speedPwm ?? false;
+  const noPwmPin = car.telemetry?.noPwmPin ?? false;
+  const carSpeed = useMemo<CarSpeedCaps>(
+    () => (state === 'connected' ? { speedPwm, noPwmPin } : UNKNOWN_CAR),
+    [state, speedPwm, noPwmPin],
+  );
 
   const value = useMemo<BluetoothValue>(
     () => ({
@@ -104,11 +113,12 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       testSupported: car.testSupported,
       saveConfig: car.saveConfig,
       sendTest: car.sendTest,
+      carSpeed,
     }),
     [
       devices, connectedDevice, isScanning, state, error, battery, scan, stopScan, connect,
       car.disconnect, car.controlLoop, car.carConfig, car.configSupported, car.testSupported,
-      car.saveConfig, car.sendTest,
+      car.saveConfig, car.sendTest, carSpeed,
     ],
   );
 

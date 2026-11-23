@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampJoystick,
   createDefaultDriveProfile,
+  joystickDirection,
   mixDrive,
   normalizeDriveProfile,
   normalizeDriveSettings,
@@ -24,16 +25,35 @@ describe('driveModel', () => {
     expect(clampJoystick(120, 0, 60)).toEqual({ x: 60, y: 0 });
   });
 
-  it('mixDrive: standard tiến hết → 4 bánh 190; mecanum ngang → dấu theo ma trận', () => {
+  it('mixDrive: standard tiến → 4 bánh = PWM của mức; mecanum ngang → dấu theo ma trận', () => {
     const p = createDefaultDriveProfile('a', 'A');
-    expect(mixDrive(p, 'medium', { x: 0, y: 1 }, 0)).toEqual({ fl: 190, fr: 190, rl: 190, rr: 190 });
+    expect(mixDrive(p, 'medium', { x: 0, y: 1 }, 0)).toEqual({ fl: 200, fr: 200, rl: 200, rr: 200 });
+    expect(mixDrive(p, 'slow', { x: 0, y: 1 }, 0)).toEqual({ fl: 140, fr: 140, rl: 140, rr: 140 });
     const m = mixDrive(setDriveWheelType(p, 'mecanum'), 'medium', { x: 1, y: 0 }, 0);
-    expect(m).toEqual({ fl: 190, fr: -190, rl: -190, rr: 190 });
+    expect(m).toEqual({ fl: 200, fr: -200, rl: -200, rr: 200 });
+  });
+
+  it('mixDrive: đẩy nhẹ cũng chạy đúng PWM của mức; chưa có chân PWM -> 255', () => {
+    const p = createDefaultDriveProfile('a', 'A');
+    expect(mixDrive(p, 'medium', { x: 0, y: 0.3 }, 0).fl).toBe(200);
+    expect(mixDrive(p, 'slow', { x: 0, y: 1 }, 0, true).fl).toBe(255);
+  });
+
+  it('mixDrive: bánh đảo chiều cho PWM ngược dấu', () => {
+    const p = createDefaultDriveProfile('a', 'A');
+    const inv = { ...p, motors: { ...p.motors, fr: { inverted: true, compensation: 100 } } };
+    expect(mixDrive(inv, 'fast', { x: 0, y: 1 }, 0)).toEqual({ fl: 255, fr: -255, rl: 255, rr: 255 });
+  });
+
+  it('joystickDirection: chỉ giữ hướng, thành phần lớn nhất = 1', () => {
+    expect(joystickDirection({ x: 0.3, y: 0 })).toEqual({ x: 1, y: 0 });
+    expect(joystickDirection({ x: 0.2, y: 0.4 })).toEqual({ x: 0.5, y: 1 });
+    expect(joystickDirection({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
   });
 
   it('mixDrive: neutral input stops every wheel and reverse input produces negative PWM', () => {
     const p = createDefaultDriveProfile('a', 'A');
     expect(mixDrive(p, 'medium', { x: 0, y: 0 }, 0)).toEqual({ fl: 0, fr: 0, rl: 0, rr: 0 });
-    expect(mixDrive(p, 'medium', { x: 0, y: -1 }, 0)).toEqual({ fl: -190, fr: -190, rl: -190, rr: -190 });
+    expect(mixDrive(p, 'medium', { x: 0, y: -1 }, 0)).toEqual({ fl: -200, fr: -200, rl: -200, rr: -200 });
   });
 });

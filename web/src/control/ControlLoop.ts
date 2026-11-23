@@ -45,7 +45,8 @@ export class ControlLoop {
 
   /** Dừng ngay: cả lệnh đích lẫn giá trị đang gửi về 0 (không làm mềm). */
   resetInput(): void {
-    this.input = { ...NEUTRAL_INPUT };
+    // Giữ mức tốc độ (speedPwm): chỉ dừng, không đổi mức.
+    this.input = { ...NEUTRAL_INPUT, speedPwm: this.input.speedPwm };
     this.sent = { x: 0, y: 0 };
   }
 

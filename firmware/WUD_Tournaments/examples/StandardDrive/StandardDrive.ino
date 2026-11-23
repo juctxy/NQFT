@@ -2,6 +2,9 @@
 //   Đẩy joystick LÊN / XUỐNG  = tiến / lùi
 //   Đẩy joystick PHẢI / TRÁI  = xoay phải / xoay trái tại chỗ
 //   Đẩy chéo                  = vừa chạy vừa rẽ
+//   Nút Chậm / Vừa / Nhanh    = PWM 140 / 200 / 255 (joystick chỉ chọn hướng, không chỉnh tốc độ)
+//
+// Yêu cầu: thư viện WUD_Tournaments 0.3.0 trở lên.
 //
 // Đấu dây (đổi theo xe của bạn):
 //   Bánh   IN1  IN2  PWM(EN)
@@ -12,10 +15,15 @@
 //
 // Chân PWM (số thứ 3) không bắt buộc. Nếu vẫn cắm jumper ENA/ENB thì bỏ số đó ở CẢ 4 bánh:
 //   Car.wheelFL(32, 33, false);  ...  (có thì có hết, không thì không có hết)
+// Không có chân PWM: web ẩn Chậm / Vừa / Nhanh, ghi "Trong code chưa set up chân PWM", xe chạy PWM 255.
+//
+// Đảo chiều 1 bánh: sửa Reverse bên dưới rồi nạp lại code, HOẶC gạt "Đảo chiều" trên web
+// (Cài đặt -> Động cơ): xe đổi chiều ngay và nhớ luôn, không cần nạp lại code.
 
 #include <WUD_Tournaments.h>
 
-// Joystick lệch khỏi giữa ít hơn mức này thì coi như chưa đẩy (tránh xe tự bò).
+// Web gửi hướng joystick: x, y = ±100 khi đẩy thẳng một phía, số nhỏ hơn khi đẩy hơi lệch.
+// Thành phần nhỏ hơn mức này coi như 0 (đẩy hơi lệch vẫn đi thẳng, không bị rẽ nhẹ).
 const int DEADZONE = 15;
 
 void setup() {
@@ -32,14 +40,24 @@ void setup() {
 
   Car.setDriveType(WUD_STD);       // xe 4 bánh thường
 
-  Car.begin();   // LED tự chớp. Car.begin(0) = không in dữ liệu nhận ra Serial.
+  // Bật Bluetooth. LED tự chớp. Car.begin(0) = không in dữ liệu nhận ra Serial.
+  // begin() trả false nếu khai báo sai (ví dụ có bánh có chân PWM, có bánh không) -> xem dòng lỗi phía trên.
+  if (!Car.begin()) {
+    Serial.println("Khoi dong that bai, sua code theo dong loi o tren roi nap lai.");
+    return;
+  }
+  if (!Car.hasPwmPins()) {
+    Serial.println("Chua khai bao chan PWM: web an muc Cham/Vua/Nhanh, xe chay PWM 255.");
+  }
 }
 
 // Lái xe theo joystick.
 // Car.x(), Car.y() nằm trong khoảng -100..100:
 //   y > 0: đẩy lên,  y < 0: đẩy xuống
 //   x > 0: đẩy phải, x < 0: đẩy trái
-// Đẩy càng mạnh thì số càng lớn -> xe chạy càng nhanh.
+// Web chỉ gửi HƯỚNG: đẩy hẳn về một phía thì số đó = ±100, đẩy nhẹ hay hết cỡ như nhau.
+// Tốc độ thật do mức Chậm / Vừa / Nhanh trên web quyết định (PWM 140 / 200 / 255):
+// tốc độ 100 % = đúng PWM của mức đang chọn.
 void driveStandard() {
   // Bước 1: mất kết nối hoặc mất tín hiệu -> dừng xe, không làm gì thêm.
   if (!Car.isConnected() || Car.isFailsafe()) {
@@ -67,7 +85,7 @@ void driveStandard() {
   } else if (pushDown && pushLeft) {
     Car.drive(x, y, 0);      // vừa lùi vừa rẽ trái
   } else if (pushUp) {
-    Car.forward(y);          // tiến thẳng, tốc độ = y
+    Car.forward(y);          // tiến thẳng; y = 100 -> chạy đúng PWM của mức đang chọn
   } else if (pushDown) {
     Car.backward(-y);        // lùi thẳng (y âm nên đổi dấu thành số dương)
   } else if (pushRight) {
@@ -86,4 +104,7 @@ void loop() {
   if (Car.CROSS.wasPressed()) {
     // TODO: sút
   }
+
+  // Cần biết mức tốc độ đang chọn trên web (140 / 200 / 255) thì đọc:
+  //   uint8_t pwm = Car.speedPwm();
 }

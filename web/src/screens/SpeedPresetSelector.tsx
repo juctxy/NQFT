@@ -1,4 +1,4 @@
-import { SPEED_LEVEL_LABELS, SPEED_LEVELS, WHEEL_IDS, type SpeedLevel } from '../drive/driveModel';
+import { LEVEL_PWM, SPEED_LEVEL_LABELS, SPEED_LEVELS, WHEEL_IDS, type SpeedLevel } from '../drive/driveModel';
 import { Pressable, Text, View, type Style } from '../ui/rn';
 
 const formatPwm = (pwm: number) => {
@@ -9,23 +9,31 @@ const formatPwm = (pwm: number) => {
 export function SpeedPresetSelector({
   level,
   wheelPwm,
+  noPwmPin = false,
   ready,
   onSelectLevel,
 }: {
   level: SpeedLevel;
   wheelPwm: Record<(typeof WHEEL_IDS)[number], number>;
+  /** Xe báo trong code chưa khai báo chân PWM -> ẩn mức tốc độ. */
+  noPwmPin?: boolean;
   ready: boolean;
   onSelectLevel: (l: SpeedLevel) => void;
 }) {
   return (
     <View style={s.root}>
+      {noPwmPin ? (
+        <View style={s.noPwm}>
+          <Text style={s.noPwmText}>Trong code chưa set up chân PWM</Text>
+        </View>
+      ) : (
       <View role="group" aria-label="Mức tốc độ" style={s.levels}>
         {SPEED_LEVELS.map((speedLevel) => {
           const selected = speedLevel === level;
           return (
             <Pressable
               key={speedLevel}
-              label={`Mức tốc độ: ${SPEED_LEVEL_LABELS[speedLevel]}`}
+              label={`Mức tốc độ: ${SPEED_LEVEL_LABELS[speedLevel]} (PWM ${LEVEL_PWM[speedLevel]})`}
               selected={selected}
               disabled={!ready}
               onPress={() => onSelectLevel(speedLevel)}
@@ -41,6 +49,7 @@ export function SpeedPresetSelector({
           );
         })}
       </View>
+      )}
       <View role="group" aria-label="PWM lệnh tính cho từng bánh" style={s.readouts}>
         {WHEEL_IDS.map((wheel) => (
           <View key={wheel} style={s.readout}>
@@ -56,6 +65,19 @@ export function SpeedPresetSelector({
 const s: Record<string, Style> = {
   root: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   levels: { flexDirection: 'row', flexShrink: 0, gap: 5 },
+  noPwm: {
+    alignItems: 'center',
+    backgroundColor: '#fff7ed',
+    borderColor: '#fdba74',
+    borderRadius: 9,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    paddingLeft: 10,
+    paddingRight: 10,
+    width: 214,
+  },
+  noPwmText: { color: '#9a3412', fontSize: 11, fontWeight: 800, textAlign: 'center' },
   levelButton: {
     alignItems: 'center',
     backgroundColor: '#f1f5f9',

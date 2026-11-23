@@ -57,7 +57,8 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
   const bt = useBluetooth();
   const profile = c.activeDriveProfile;
   const level = c.driveSettings.activeLevel;
-  const drive = useDriveInput(bt.controlLoop, profile, level, bt.connectionKey);
+  const drive = useDriveInput(bt.controlLoop, profile, level, bt.connectionKey, bt.carSpeed);
+  const noPwmPin = Boolean(bt.connectedDevice) && bt.carSpeed.noPwmPin;
 
   const isLandscape = useIsLandscape();
   const { standalone } = useInstallApp();
@@ -82,6 +83,25 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
 
   // Chạy thử từng bánh (trang Động cơ).
   const motorTest = useMotorTest(bt.sendTest);
+
+  // Công tắc Đảo chiều: đổi trên web và (nếu đang kết nối) ghi xuống xe ngay, chỉ đổi phần đảo chiều,
+  // các thông số khác chưa lưu vẫn giữ nguyên trên xe.
+  const handleInvertChange = useCallback(
+    (w: WheelId, inverted: boolean) => {
+      const next = { ...profile, motors: { ...profile.motors, [w]: { ...profile.motors[w], inverted } } };
+      c.updateDriveProfile(next);
+      if (!bt.connectedDevice || !bt.configSupported) return;
+      const base = bt.carConfig ?? configFromProfile(next);
+      setSaving(true);
+      bt.saveConfig({ ...base, invertMask: configFromProfile(next).invertMask })
+        .then((back) => {
+          if (!back || back.invertMask !== configFromProfile(next).invertMask) window.alert(`Xe chưa nhận lệnh đảo chiều. ${OLD_FIRMWARE}`);
+        })
+        .catch((e) => window.alert(`Không đổi được chiều động cơ: ${e instanceof Error ? e.message : String(e)}`))
+        .finally(() => setSaving(false));
+    },
+    [profile, c, bt],
+  );
   const handleTestStart = useCallback(
     (w: WheelId) => {
       if (!bt.connectedDevice) return window.alert(NEED_CONNECT);
@@ -185,13 +205,12 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
     switch (activeSubPage) {
       case 'speed':
         subPageTitle = 'Tốc độ';
-        subPageDesc = 'Thiết lập mức xung PWM (0–255) cho từng cấp tốc độ và trục chuyển động.';
+        subPageDesc = 'PWM cố định cho từng mức: Chậm 140, Vừa 200, Nhanh 255. Joystick chỉ chọn hướng.';
         subPageContent = (
           <SpeedSubPage
-            profile={profile}
             level={level}
-            onUpdate={c.updateDriveProfile}
             onSelectLevel={c.selectSpeedLevel}
+            noPwmPin={noPwmPin}
           />
         );
         break;
@@ -214,6 +233,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           <MotorSubPage
             profile={profile}
             onUpdate={c.updateDriveProfile}
+            onInvertChange={handleInvertChange}
             onTestStart={handleTestStart}
             onTestEnd={motorTest.stopTest}
           />
@@ -229,6 +249,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
             level={level}
             onControlChange={drive.setJoystick}
             onRotateChange={drive.setRotate}
+            noPwmPin={noPwmPin}
           />
         );
         break;

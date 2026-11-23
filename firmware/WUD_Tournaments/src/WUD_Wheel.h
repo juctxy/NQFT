@@ -17,6 +17,9 @@ public:
   // Chạy thử từ web: chỉ tính reverse trong code, bỏ qua đảo chiều / bù / PWM tối thiểu của CONFIG.
   void test(int speed);
 
+  // PWM ứng với tốc độ 100 % (mức tốc độ trên web: Chậm 140, Vừa 200, Nhanh 255).
+  void setMaxPwm(uint8_t pwm);
+
   int speed() const { return _speed; }
   bool attached() const { return _driver != nullptr; }
 
@@ -33,6 +36,7 @@ private:
   bool _invert = false;     // đảo chiều từ ô CONFIG (UI)
   uint8_t _trim = 100;      // bù công suất 0..100 %
   uint8_t _minPwm = 0;      // PWM tối thiểu 0..255 khi bánh đang quay
+  uint8_t _maxPwm = 255;    // PWM khi tốc độ = 100 %
   int _speed = 0;
   int _lastDuty = 0;
   bool _dirty = true;

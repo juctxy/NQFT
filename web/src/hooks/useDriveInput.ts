@@ -24,6 +24,8 @@ export function useDriveInput(controlLoop: ControlLoop, profile: DriveProfile, l
 
   // Đổi hồ sơ / mức tốc độ / vừa kết nối lại -> tính lại lệnh.
   useEffect(push, [push, profile, level, connectedKey]);
+  // Tăng tốc mềm (trang Động cơ) làm ngay trên web, xe không cần biết.
+  useEffect(() => controlLoop.setSoftAccel(profile.softAccelMs), [controlLoop, profile.softAccelMs]);
 
   const setJoystick = useCallback(
     (v: Vec) => {
@@ -75,13 +77,14 @@ export function useDriveInput(controlLoop: ControlLoop, profile: DriveProfile, l
     [setBit],
   );
 
-  /** Dừng ngay: thả joystick, nút xoay và mọi nút. */
+  /** Dừng ngay: thả joystick, nút xoay và mọi nút (bỏ qua tăng tốc mềm). */
   const stop = useCallback(() => {
     releaseTimers.current.forEach(clearTimeout);
     releaseTimers.current.clear();
     input.current = { joystick: { x: 0, y: 0 }, rotate: 0, buttons: 0 };
+    controlLoop.resetInput();
     push();
-  }, [push]);
+  }, [push, controlLoop]);
 
   // Rời màn hình hoặc ẩn app -> dừng.
   useEffect(() => {

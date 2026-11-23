@@ -1,18 +1,27 @@
 // Đồng bộ với firmware/WUD_Tournaments/src/WUD_Protocol.h và docs/protocol.md
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export const SERVICE_UUID = '6e3a0001-8f5c-4b7a-9d2e-3c1f0a7b5e10';
 export const CONTROL_CHAR_UUID = '6e3a0002-8f5c-4b7a-9d2e-3c1f0a7b5e10';
 export const TELEMETRY_CHAR_UUID = '6e3a0003-8f5c-4b7a-9d2e-3c1f0a7b5e10';
-/** Thông số PWM từng bánh (8 byte). Firmware đã có, UI chưa dùng. */
+/** Thông số từng bánh + ma trận hướng (12 byte), ghi khi bấm "Lưu vào xe". */
 export const CONFIG_CHAR_UUID = '6e3a0004-8f5c-4b7a-9d2e-3c1f0a7b5e10';
+/** Chạy thử 1 bánh (2 byte), gửi lặp lại khi giữ nút KIỂM TRA. */
+export const TEST_CHAR_UUID = '6e3a0005-8f5c-4b7a-9d2e-3c1f0a7b5e10';
 
 export const DEVICE_NAME_PREFIX = 'RC-Car-';
 
 export const CONTROL_PACKET_LEN = 4;
 export const TELEMETRY_PACKET_LEN = 4;
-export const CONFIG_PACKET_LEN = 8;
-export const CONFIG_VERSION = 1;
+export const CONFIG_PACKET_LEN = 12;
+/** CONFIG v1 (firmware 0.1.x): 8 byte, không có ma trận. */
+export const CONFIG_V1_LEN = 8;
+export const CONFIG_VERSION = 2;
+export const TEST_PACKET_LEN = 2;
+/** Byte bánh = 0xFF: dừng chạy thử. */
+export const TEST_STOP = 0xff;
+/** Gửi lại gói TEST mỗi 100 ms khi đang giữ nút (xe tự dừng nếu 300 ms không nhận). */
+export const TEST_INTERVAL_MS = 100;
 
 /** Tần số gửi lệnh: 30 Hz */
 export const CONTROL_INTERVAL_MS = 33;

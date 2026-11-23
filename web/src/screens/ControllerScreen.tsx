@@ -1,7 +1,7 @@
 // Màn hình tay cầm — chuyển từ ControllerScreen của NQFT (juctxy.github.io/NQFT).
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bluetooth, BookOpen, Circle, Settings, Square, Triangle, X } from 'lucide-react';
-import { clampJoystick, normalizeJoystick, type Vec } from '../drive/driveModel';
+import { clampJoystick, mixDrive, normalizeJoystick, type Vec } from '../drive/driveModel';
 import { useController } from '../drive/ControllerContext';
 import { nearbyDeviceName, useBluetooth } from '../hooks/BluetoothContext';
 import { useDriveInput } from '../hooks/useDriveInput';
@@ -128,12 +128,35 @@ function HoldButton({
 }
 
 export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpenInstructions: () => void; onOpenSettings: () => void }) {
-  const { driveSettings, activeDriveProfile: profile, driveSettingsReady, selectDriveProfile, selectSpeedLevel } = useController();
+  const { driveSettings, activeDriveProfile: profile, driveSettingsReady, selectSpeedLevel } = useController();
   const bt = useBluetooth();
   const drive = useDriveInput(bt.controlLoop, profile, driveSettings.activeLevel, bt.connectionKey);
+  const [joystick, setJoystick] = useState<Vec>({ x: 0, y: 0 });
+  const [rotate, setRotate] = useState(0);
   const [pickerVisible, setPickerVisible] = useState(false);
   const viewport = useViewport();
   const scale = 0.96 * Math.min(viewport.width / CANVAS_W, viewport.height / CANVAS_H);
+  const wheelPwm = mixDrive(profile, driveSettings.activeLevel, joystick, rotate);
+
+  const onJoystickChange = (value: Vec) => {
+    setJoystick(value);
+    drive.setJoystick(value);
+  };
+  const onRotateChange = (value: number) => {
+    setRotate(value);
+    drive.setRotate(value);
+  };
+
+  useEffect(() => {
+    const resetReadout = () => {
+      if (document.hidden) {
+        setJoystick({ x: 0, y: 0 });
+        setRotate(0);
+      }
+    };
+    document.addEventListener('visibilitychange', resetReadout);
+    return () => document.removeEventListener('visibilitychange', resetReadout);
+  }, []);
 
   const openPicker = useCallback(() => {
     setPickerVisible(true);
@@ -144,7 +167,6 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
     bt.stopScan();
   }, [bt]);
 
-  const quick = driveSettings.profiles.slice(0, 2);
   const action = (code: number) => ({ onDown: () => drive.pressButton(code), onUp: () => drive.releaseButton(code) });
 
   return (
@@ -162,22 +184,12 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
             <Text style={s.wheelTypeLabel}>
               Bánh: {profile.wheelType === 'standard' ? 'Standard' : profile.wheelType === 'omni' ? 'Omni' : 'Mecanum'}
             </Text>
-            <SpeedPresetSelector level={driveSettings.activeLevel} ready={driveSettingsReady} onSelectLevel={selectSpeedLevel} />
-            {quick.length > 1 ? (
-              <View style={s.quickSwitchRow}>
-                {quick.map((p, i) => (
-                  <Pressable
-                    key={p.id}
-                    label={`Chọn nhanh hồ sơ ${i === 0 ? 'A' : 'B'}: ${p.name}`}
-                    selected={p.id === profile.id}
-                    onPress={() => selectDriveProfile(p.id)}
-                    style={[s.quickSwitchButton, p.id === profile.id && s.quickSwitchButtonActive]}
-                  >
-                    <Text style={[s.quickSwitchText, p.id === profile.id && s.quickSwitchTextActive]}>{i === 0 ? 'A' : 'B'}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
+            <SpeedPresetSelector
+              level={driveSettings.activeLevel}
+              wheelPwm={wheelPwm}
+              ready={driveSettingsReady}
+              onSelectLevel={selectSpeedLevel}
+            />
           </View>
 
           <View style={s.rightTopStack}>
@@ -213,7 +225,7 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
         <View style={s.gamepadBody}>
           <View style={[s.gamepadBridge, { pointerEvents: 'none' }]} />
           <View style={s.gripCircle}>
-            <Joystick wheelType={profile.wheelType} onChange={drive.setJoystick} />
+            <Joystick wheelType={profile.wheelType} onChange={onJoystickChange} />
           </View>
 
           <View style={s.centerButtons}>
@@ -225,10 +237,10 @@ export function ControllerScreen({ onOpenInstructions, onOpenSettings }: { onOpe
             </HoldButton>
             {profile.wheelType !== 'standard' ? (
               <View style={s.rotateControls}>
-                <HoldButton label="QUẸO TRÁI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => drive.setRotate(-1)} onUp={() => drive.setRotate(0)}>
+                <HoldButton label="QUẸO TRÁI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => onRotateChange(-1)} onUp={() => onRotateChange(0)}>
                   <Text style={s.rotateButtonText}>QUẸO TRÁI</Text>
                 </HoldButton>
-                <HoldButton label="QUẸO PHẢI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => drive.setRotate(1)} onUp={() => drive.setRotate(0)}>
+                <HoldButton label="QUẸO PHẢI" style={s.rotateButton} pressedStyle={s.pressedButton} onDown={() => onRotateChange(1)} onUp={() => onRotateChange(0)}>
                   <Text style={s.rotateButtonText}>QUẸO PHẢI</Text>
                 </HoldButton>
               </View>
@@ -297,13 +309,9 @@ const s: Record<string, Style> = {
     padding: '7px 10px',
     position: 'relative',
     zIndex: 10,
+    transform: 'translateX(-16px)',
   },
   wheelTypeLabel: { color: '#334155', fontSize: 11, fontWeight: 700 },
-  quickSwitchRow: { flexDirection: 'row', gap: 4 },
-  quickSwitchButton: { alignItems: 'center', backgroundColor: '#e2e8f0', borderRadius: 5, height: 24, justifyContent: 'center', width: 28 },
-  quickSwitchButtonActive: { backgroundColor: '#f47518' },
-  quickSwitchText: { color: '#334155', fontSize: 10, fontWeight: 800 },
-  quickSwitchTextActive: { color: '#fff' },
   rightTopStack: { alignItems: 'stretch', gap: 6 },
   bluetoothButton: {
     alignItems: 'center',

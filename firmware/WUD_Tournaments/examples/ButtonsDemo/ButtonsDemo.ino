@@ -7,16 +7,16 @@ void setup() {
   Serial.begin(115200);
 
   Car.setName("AA11");   // tên Bluetooth: RC-Car-AA11
-  // LED: nháy chậm = chờ, sáng = đã kết nối, nháy nhanh = failsafe.
-  // GPIO2 = LED trên đa số board ESP32 DevKit; truyền -1 nếu board không có LED.
-  Car.begin(2);
+  // LED tự chớp: nháy chậm = chờ, sáng = đã kết nối, nháy nhanh = failsafe.
+  // DebugMode (không bắt buộc): 1 = in dữ liệu tay cầm gửi tới ra Serial (mặc định); 0 = không in.
+  Car.begin(1);
 }
 
 void loop() {
   Car.update();          // bắt buộc gọi đầu mỗi vòng loop()
 
   // Chỉ in khi tín hiệu thay đổi.
-  if (Car.hasChanged()) {
+  if (Car.debugMode() && Car.hasChanged()) {
     WUD_Signal s = Car.signal();
     Serial.printf("x=%4d  y=%4d  nut=0x%02X\n", s.x, s.y, s.flags);
   }

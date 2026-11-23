@@ -14,6 +14,9 @@ public:
   void setSpeed(int speed);
   void stop() { setSpeed(0); }
 
+  // Chạy thử từ web: chỉ tính reverse trong code, bỏ qua đảo chiều / bù / PWM tối thiểu của CONFIG.
+  void test(int speed);
+
   int speed() const { return _speed; }
   bool attached() const { return _driver != nullptr; }
 
@@ -33,4 +36,5 @@ private:
   int _speed = 0;
   int _lastDuty = 0;
   bool _dirty = true;
+  bool _raw = false;        // true = đang chạy thử (test())
 };

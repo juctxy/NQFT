@@ -40,8 +40,8 @@ export function SpeedSubPage({ level, onSelectLevel, noPwmPin = false }: SpeedSu
               ))}
             </View>
             <Text style={s.hintText}>
-              PWM cố định cho mỗi mức. Joystick chỉ chọn hướng: đẩy nhẹ hay đẩy hết cỡ, xe đều chạy đúng PWM của mức đang chọn
-              (sau đó mới trừ bù công suất từng bánh).
+              PWM cố định cho mỗi mức. Joystick chọn hướng gần nhất trong 8 hướng (4 hướng thẳng, 4 hướng chéo); tốc độ theo
+              mức đang chọn, sau đó mới trừ bù công suất từng bánh.
             </Text>
           </>
         )}

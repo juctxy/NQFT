@@ -1,14 +1,11 @@
-import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { theme } from '../theme';
 import { WHEEL_IDS, type DriveProfile, type WheelId } from '../../../drive/driveModel';
-import { DarkNumericSetting } from '../sharedControls';
-import { Slider, Switch } from '../../../ui/controls';
+import { Switch } from '../../../ui/controls';
 import { Pressable, Text, View, type Style } from '../../../ui/rn';
 
 interface MotorSubPageProps {
   profile: DriveProfile;
-  onUpdate: (p: DriveProfile) => void;
   /** Gạt công tắc Đảo chiều: đang kết nối thì áp dụng xuống xe ngay. */
   onInvertChange: (wheel: WheelId, inverted: boolean) => void;
   /** Bắt đầu giữ nút KIỂM TRA của 1 bánh. */
@@ -19,13 +16,10 @@ interface MotorSubPageProps {
 
 export function MotorSubPage({
   profile,
-  onUpdate,
   onInvertChange,
   onTestStart,
   onTestEnd,
 }: MotorSubPageProps) {
-  const [accel, setAccel] = useState(profile.softAccelMs);
-
   return (
     <View style={s.container}>
       {/* Kiểm tra từng động cơ & Đảo chiều */}
@@ -69,46 +63,6 @@ export function MotorSubPage({
               </Pressable>
             </View>
           ))}
-        </View>
-      </View>
-
-      {/* Tăng tốc mềm */}
-      <View style={s.sectionCard}>
-        <Text style={s.sectionTitle}>Tăng tốc mềm (Soft Acceleration)</Text>
-        <Text style={s.hintText}>
-          Thời gian chuyển đổi mượt mà khi tăng/giảm ga để bảo vệ động cơ và chống trượt bánh.
-        </Text>
-
-        <View style={s.accelCard}>
-          <View style={s.accelHeader}>
-            <Text style={s.accelLabel}>Thời gian gia tốc</Text>
-            <Text style={s.accelReadout}>{accel} ms</Text>
-          </View>
-          <Slider
-            label="Thời gian tăng tốc mềm"
-            min={0}
-            max={400}
-            step={10}
-            value={accel}
-            onValueChange={(v) => setAccel(Math.round(v))}
-            onSlidingComplete={(v) =>
-              onUpdate({ ...profile, softAccelMs: Math.round(v) })
-            }
-            minimumTrackTintColor={theme.accent}
-            maximumTrackTintColor={theme.cardBorder}
-            thumbTintColor={theme.accent}
-            style={s.slider}
-          />
-          <DarkNumericSetting
-            label="Nhập chính xác"
-            value={profile.softAccelMs}
-            min={0}
-            max={400}
-            suffix="ms"
-            onChange={(v) =>
-              onUpdate({ ...profile, softAccelMs: Math.round(v) })
-            }
-          />
         </View>
       </View>
     </View>
@@ -188,27 +142,5 @@ const s: Record<string, Style> = {
     color: '#fff',
     fontSize: 12,
     fontWeight: 800,
-  },
-  accelCard: {
-    gap: 8,
-    marginTop: 4,
-  },
-  accelHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  accelLabel: {
-    color: theme.text,
-    fontSize: 13,
-    fontWeight: 700,
-  },
-  accelReadout: {
-    color: theme.accent,
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  slider: {
-    width: '100%',
   },
 };

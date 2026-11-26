@@ -6,6 +6,7 @@ import { mapDrive, type DriveInput } from './mapInput';
 const standard = createDefaultDriveProfile('a', 'A'); // maxLimit 255
 const newCar = { speedPwm: true, noPwmPin: false };
 const omni = setDriveWheelType(standard, 'omni');
+const mecanum = setDriveWheelType(standard, 'mecanum');
 const idle: DriveInput = { joystick: { x: 0, y: 0 }, rotate: 0, buttons: 0 };
 
 describe('mapDrive', () => {
@@ -27,9 +28,19 @@ describe('mapDrive', () => {
     expect(mapDrive(standard, 'fast', up, newCar).speedPwm).toBe(255);
   });
 
-  it('đẩy nhẹ cũng chạy hết mức; hướng chéo giữ đúng tỉ lệ', () => {
+  it('đẩy nhẹ cũng chạy hết mức; hướng joystick được snap về hướng chéo gần nhất', () => {
     expect(mapDrive(standard, 'medium', { ...idle, joystick: { x: 0, y: 0.25 } }, newCar).y).toBe(100);
-    expect(mapDrive(standard, 'medium', { ...idle, joystick: { x: 0.2, y: 0.4 } }, newCar)).toMatchObject({ x: 50, y: 100 });
+    expect(mapDrive(standard, 'medium', { ...idle, joystick: { x: 0.2, y: 0.4 } }, newCar)).toMatchObject({ x: 100, y: 100 });
+  });
+
+  it('mọi loại bánh đều gửi vector thẳng hoặc chéo đủ mức', () => {
+    for (const profile of [standard, omni, mecanum]) {
+      expect(mapDrive(profile, 'medium', { ...idle, joystick: { x: 0.8, y: 0.9 } }, newCar)).toMatchObject({
+        x: 100,
+        y: 100,
+        speedPwm: 200,
+      });
+    }
   });
 
   it('xe chưa có chân PWM: bỏ mức tốc độ, luôn 255', () => {
@@ -59,8 +70,9 @@ describe('mapDrive', () => {
     expect(mapDrive(limited, 'fast', { ...idle, joystick: { x: 1, y: 0 } }).x).toBe(50);
   });
 
-  it('omni: quẹo trái → bit 6 (0x40), quẹo phải → bit 7 (0x80)', () => {
-    expect(mapDrive(omni, 'fast', { ...idle, rotate: -1 }).flags).toBe(ButtonBit.TurnLeft);
+  it('omni: xoay trái/phải giữ bit riêng khi joystick đang di chuyển', () => {
+    const left = mapDrive(omni, 'fast', { ...idle, joystick: { x: 0.8, y: 0.9 }, rotate: -1 });
+    expect(left).toMatchObject({ x: 100, y: 100, flags: ButtonBit.TurnLeft });
     expect(mapDrive(omni, 'fast', { ...idle, rotate: 1 }).flags).toBe(0x80);
     expect(mapDrive(omni, 'fast', { ...idle, rotate: 1, buttons: ButtonBit.Cross }).flags).toBe(0xa0);
   });

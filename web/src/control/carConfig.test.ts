@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultDriveProfile, setMatrixSign } from '../drive/driveModel';
 import { decodeConfig, encodeConfig, encodeTest } from '../protocol/packet';
 import { configFromProfile, sameConfig } from './carConfig';
-import { ControlLoop, rampToward } from './ControlLoop';
+import { ControlLoop } from './ControlLoop';
 import type { Transport } from '../transport/Transport';
 
 describe('CONFIG v2', () => {
@@ -48,33 +48,16 @@ describe('gói TEST', () => {
   });
 });
 
-describe('tăng tốc mềm', () => {
-  it('rampToward đi từng bước, không vượt đích', () => {
-    expect(rampToward(0, 100, 30)).toBe(30);
-    expect(rampToward(90, 100, 30)).toBe(100);
-    expect(rampToward(50, -50, 30)).toBe(20);
-  });
-
-  it('200 ms: 0 -> 100 mất 200 ms; 0 ms: nhảy ngay', () => {
+describe('đầu ra điều khiển tức thì', () => {
+  it('gửi ngay lệnh di chuyển, đổi hướng và dừng', () => {
     const loop = new ControlLoop({} as Transport);
-    loop.setSoftAccel(200);
     loop.setInput({ y: 100, x: 0, flags: 4 });
-    expect(loop.nextOutput(1000)).toEqual({ y: 100 * (33 / 200), x: 0, flags: 4 }); // nhịp đầu = 33 ms
-    expect(loop.nextOutput(1100).y).toBeCloseTo(66.5);
-    expect(loop.nextOutput(1200).y).toBe(100);
+    expect(loop.nextOutput()).toEqual({ y: 100, x: 0, flags: 4 });
 
-    loop.setSoftAccel(0);
-    loop.setInput({ y: -100 });
-    expect(loop.nextOutput(1233).y).toBe(-100);
-  });
+    loop.setInput({ y: -100, x: 100 });
+    expect(loop.nextOutput()).toEqual({ y: -100, x: 100, flags: 4 });
 
-  it('resetInput dừng ngay, không làm mềm', () => {
-    const loop = new ControlLoop({} as Transport);
-    loop.setSoftAccel(400);
-    loop.setInput({ y: 100 });
-    loop.nextOutput(0);
-    loop.nextOutput(400);
     loop.resetInput();
-    expect(loop.nextOutput(433).y).toBe(0);
+    expect(loop.nextOutput()).toEqual({ y: 0, x: 0, flags: 0 });
   });
 });

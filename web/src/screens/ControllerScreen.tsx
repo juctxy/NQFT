@@ -27,7 +27,7 @@ function useViewport() {
   return v;
 }
 
-/** Joystick analog 360°: chạm vào đâu, núm nhảy tới đó; thả tay về giữa. */
+/** Joystick chọn hướng gần nhất trong 8 hướng; thả tay là về giữa. */
 function Joystick({ wheelType, onChange }: { wheelType: string; onChange: (v: Vec) => void }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const active = useRef<{ id: number; scale: number; left: number; top: number } | null>(null);
@@ -56,8 +56,8 @@ function Joystick({ wheelType, onChange }: { wheelType: string; onChange: (v: Ve
   return (
     <View
       role="slider"
-      aria-label="Cần điều khiển analog 360 độ"
-      title={wheelType === 'standard' ? 'Lên xuống để tiến lùi, trái phải để quay tại chỗ' : 'Điều khiển xe di chuyển liên tục theo mọi hướng'}
+      aria-label="Cần điều khiển 8 hướng"
+      title={wheelType === 'standard' ? 'Điều khiển tiến lùi, quay và các hướng chéo; joystick tự chọn hướng gần nhất trong 8 hướng' : 'Di chuyển theo hướng gần nhất trong 8 hướng; dùng nút QUẸO để xoay tại chỗ'}
       style={s.joystick}
       className="rn-touch"
       onPointerDown={down}

@@ -26,7 +26,6 @@ export interface DriveProfile {
   motors: Record<WheelId, MotorOptions>;
   minPwm: number;
   maxLimit: number;
-  softAccelMs: number;
 }
 
 export interface DriveSettings {
@@ -89,7 +88,6 @@ export function createDefaultDriveProfile(id: string, name: string): DriveProfil
     motors: Object.fromEntries(WHEEL_IDS.map((w) => [w, { inverted: false, compensation: 100 }])) as Record<WheelId, MotorOptions>,
     minPwm: 35,
     maxLimit: 255,
-    softAccelMs: 200,
   };
 }
 
@@ -112,7 +110,6 @@ export function normalizeDriveProfile(raw: unknown): DriveProfile {
     motors: normalizeMotors(p.motors),
     minPwm: clampInt(p.minPwm, 35, 0, maxLimit),
     maxLimit,
-    softAccelMs: clampInt(p.softAccelMs, 200, 0, 400),
   };
 }
 
@@ -179,6 +176,26 @@ export function joystickDirection(j: Vec): Vec {
   return { x: j.x / m, y: j.y / m };
 }
 
+const OCTANT_DIRECTIONS = [
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 1 },
+  { x: -1, y: 0 },
+  { x: -1, y: -1 },
+  { x: 0, y: -1 },
+  { x: 1, y: -1 },
+] as const;
+
+/** Snap a non-neutral direction to its nearest cardinal or diagonal octant. */
+export function snapJoystickDirection(direction: Vec): Vec {
+  if (direction.x === 0 && direction.y === 0) return { x: 0, y: 0 };
+  const angle = Math.atan2(direction.y, direction.x);
+  const octant = Math.floor((angle + Math.PI / 8) / (Math.PI / 4));
+  const snapped = OCTANT_DIRECTIONS[(octant + OCTANT_DIRECTIONS.length) % OCTANT_DIRECTIONS.length];
+  return { x: snapped.x, y: snapped.y };
+}
+
 /** PWM của mức tốc độ; xe chưa có chân PWM -> luôn 255. */
 export function levelPwm(level: SpeedLevel, noPwmPin = false): number {
   return noPwmPin ? 255 : LEVEL_PWM[level];
@@ -190,7 +207,7 @@ export function levelPwm(level: SpeedLevel, noPwmPin = false): number {
  */
 export function mixDrive(profile: DriveProfile, level: SpeedLevel, joystick: Vec, rotate: number, noPwmPin = false): Record<WheelId, number> {
   const p = normalizeDriveProfile(profile);
-  const d = joystickDirection(normalizeJoystick(joystick.x, joystick.y));
+  const d = snapJoystickDirection(joystickDirection(normalizeJoystick(joystick.x, joystick.y)));
   const side = p.wheelType === 'standard' ? 0 : d.x;
   const fwd = d.y;
   const turn = p.wheelType === 'standard' ? d.x + rotate : rotate;

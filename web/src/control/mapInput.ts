@@ -1,4 +1,4 @@
-import { joystickDirection, levelPwm, normalizeJoystick, type DriveProfile, type SpeedLevel, type Vec } from '../drive/driveModel';
+import { joystickDirection, levelPwm, normalizeJoystick, snapJoystickDirection, type DriveProfile, type SpeedLevel, type Vec } from '../drive/driveModel';
 import { BUTTON_MASK, ButtonBit } from '../protocol/constants';
 import type { ControlInput } from '../protocol/packet';
 
@@ -37,7 +37,7 @@ export const UNKNOWN_CAR: CarSpeedCaps = { speedPwm: false, noPwmPin: false };
  * - flags = các nút đang giữ (bit 0..5) + nút quẹo trái/phải (bit 6/7, chỉ omni/mecanum).
  */
 export function mapDrive(profile: DriveProfile, level: SpeedLevel, input: DriveInput, car: CarSpeedCaps = UNKNOWN_CAR): ControlInput {
-  const d = joystickDirection(normalizeJoystick(input.joystick.x, input.joystick.y));
+  const d = snapJoystickDirection(joystickDirection(normalizeJoystick(input.joystick.x, input.joystick.y)));
   const pwm = Math.min(levelPwm(level, car.noPwmPin), profile.maxLimit);
   const standard = profile.wheelType === 'standard';
   let flags = input.buttons & BUTTON_MASK;

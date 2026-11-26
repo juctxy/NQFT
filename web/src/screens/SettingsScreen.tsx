@@ -228,11 +228,10 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
 
       case 'motor':
         subPageTitle = 'Động cơ';
-        subPageDesc = 'Kiểm tra quay từng động cơ, đảo chiều cực tính và chỉnh tăng tốc mềm.';
+        subPageDesc = 'Kiểm tra quay từng động cơ và đảo chiều cực tính.';
         subPageContent = (
           <MotorSubPage
             profile={profile}
-            onUpdate={c.updateDriveProfile}
             onInvertChange={handleInvertChange}
             onTestStart={handleTestStart}
             onTestEnd={motorTest.stopTest}

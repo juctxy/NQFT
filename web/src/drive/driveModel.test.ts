@@ -6,13 +6,15 @@ import {
   mixDrive,
   normalizeDriveProfile,
   normalizeDriveSettings,
+  snapJoystickDirection,
   setDriveWheelType,
 } from './driveModel';
 
 describe('driveModel', () => {
   it('hồ sơ hỏng được đưa về giá trị hợp lệ', () => {
     const p = normalizeDriveProfile({ wheelType: 'x', maxLimit: 999, minPwm: 500, softAccelMs: -5, name: '  ' });
-    expect(p).toMatchObject({ wheelType: 'standard', maxLimit: 255, minPwm: 255, softAccelMs: 0, name: 'Hồ sơ mới' });
+    expect(p).toMatchObject({ wheelType: 'standard', maxLimit: 255, minPwm: 255, name: 'Hồ sơ mới' });
+    expect(p).not.toHaveProperty('softAccelMs');
   });
 
   it('settings rỗng → 2 hồ sơ mặc định, mức Vừa', () => {
@@ -49,6 +51,39 @@ describe('driveModel', () => {
     expect(joystickDirection({ x: 0.3, y: 0 })).toEqual({ x: 1, y: 0 });
     expect(joystickDirection({ x: 0.2, y: 0.4 })).toEqual({ x: 0.5, y: 1 });
     expect(joystickDirection({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
+  });
+
+  it('snapJoystickDirection: chọn đúng 8 hướng thẳng và chéo', () => {
+    const directions = [
+      [{ x: 1, y: 0 }, { x: 1, y: 0 }],
+      [{ x: 1, y: 1 }, { x: 1, y: 1 }],
+      [{ x: 0, y: 1 }, { x: 0, y: 1 }],
+      [{ x: -1, y: 1 }, { x: -1, y: 1 }],
+      [{ x: -1, y: 0 }, { x: -1, y: 0 }],
+      [{ x: -1, y: -1 }, { x: -1, y: -1 }],
+      [{ x: 0, y: -1 }, { x: 0, y: -1 }],
+      [{ x: 1, y: -1 }, { x: 1, y: -1 }],
+    ] as const;
+
+    for (const [input, expected] of directions) {
+      expect(snapJoystickDirection(input)).toEqual(expected);
+    }
+    expect(snapJoystickDirection({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
+  });
+
+  it('snapJoystickDirection: đúng ranh giới 22.5 độ luôn chọn hướng chéo', () => {
+    const boundary = { x: Math.cos(Math.PI / 8), y: Math.sin(Math.PI / 8) };
+    expect(snapJoystickDirection(boundary)).toEqual({ x: 1, y: 1 });
+  });
+
+  it('mixDrive: preview chéo dùng hướng đã snap thay vì tỷ lệ joystick analog', () => {
+    const mecanum = setDriveWheelType(createDefaultDriveProfile('a', 'A'), 'mecanum');
+    expect(mixDrive(mecanum, 'medium', { x: 0.8, y: 0.9 }, 0)).toEqual({
+      fl: 200,
+      fr: 0,
+      rl: 0,
+      rr: 200,
+    });
   });
 
   it('mixDrive: neutral input stops every wheel and reverse input produces negative PWM', () => {

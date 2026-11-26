@@ -32,8 +32,6 @@ export function useDriveInput(
 
   // Đổi hồ sơ / mức tốc độ / vừa kết nối lại / biết thêm về xe -> tính lại lệnh.
   useEffect(push, [push, profile, level, connectedKey, car.speedPwm, car.noPwmPin]);
-  // Tăng tốc mềm (trang Động cơ) làm ngay trên web, xe không cần biết.
-  useEffect(() => controlLoop.setSoftAccel(profile.softAccelMs), [controlLoop, profile.softAccelMs]);
 
   const setJoystick = useCallback(
     (v: Vec) => {
@@ -85,7 +83,7 @@ export function useDriveInput(
     [setBit],
   );
 
-  /** Dừng ngay: thả joystick, nút xoay và mọi nút (bỏ qua tăng tốc mềm). */
+  /** Dừng ngay: thả joystick, nút xoay và mọi nút. */
   const stop = useCallback(() => {
     releaseTimers.current.forEach(clearTimeout);
     releaseTimers.current.clear();

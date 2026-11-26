@@ -14,3 +14,7 @@ Thumbs.db
 signing-key-info.txt
 *.apk
 *.aab
+
+.superpowers
+.venv
+.history
